@@ -1,177 +1,128 @@
 import torch
 import torch.nn as nn
-import torch.optim as optim
 from torch.utils.data import DataLoader
-from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR
-from tqdm import tqdm
-from transformers import AutoTokenizer, AutoModelForCTC
-from dataclasses import dataclass
-import wandb
+from transformers import AutoTokenizer
 import os
-import random
+from datetime import datetime
+from dataclasses import dataclass
+from typing import Optional, List
 import numpy as np
 
-from dataloader import SpokenCOCODataset, spokenCOCO_collate
 from model import VisionConditionedASR
+from dataloader import create_dataloader
 
-# ========================================
-# 設定クラス
-# ========================================
+
 @dataclass
 class TrainingConfig:
-    """学習に関する設定パラメータ"""
-    # シード値
-    seed: int = 42
+    """学習設定"""
+    # データセット設定
+    train_json: str = "../../Datasets/SpokenCOCO/SpokenCOCO_train.json"
+    val_json: str = "../../Datasets/SpokenCOCO/SpokenCOCO_val.json"
+    audio_dir: str = "../../Datasets/SpokenCOCO"
+    image_dir: str = "../../Datasets/stair_captions/images"
     
-    # wandb設定
-    use_wandb: bool = False  # wandbロギングを使用するかどうか
-    wandb_project: str = "VisionConditionedASR"  # wandbプロジェクト名
+    # モデル設定
+    vocab_size: Optional[int] = None  # Noneで自動取得
+    hidden_dim: int = 256
+    num_heads: int = 2
     
-    # 学習パラメータ
-    epochs: int = 10
+    # 学習設定
     batch_size: int = 8
-    gradient_accumulation_steps: int = 16
+    num_epochs: int = 10
+    learning_rate: float = 1e-4
+    weight_decay: float = 1e-5
+    gradient_clip: float = 1.0
     
-    # 学習率設定（パラメータグループごと）
-    learning_rate_audio_encoder: float = 1e-5   # Audio Encoder (pre trained)
-    learning_rate_vision_encoder: float = 1e-5  # Vision Encoder (pre trained)
-    learning_rate_cross_attention: float = 1e-5 # Cross Attention (new)
-    learning_rate_classifier: float = 1e-5      # Classifier (new)
+    # データローダー設定
+    num_workers: int = 4
+    max_audio_length: float = 10.0  # 秒
+    validate_files: bool = True
     
-    # 学習率スケジューラー
-    warmup_steps: int = 500                     # ウォームアップステップ数
-    use_scheduler: bool = True                  # スケジューラーを使用するか
+    # 層凍結設定
+    freeze_audio_encoder: bool = True
+    freeze_vision_encoder: bool = True
+    freeze_cross_attention: bool = False
     
-    # 勾配クリッピング
-    max_grad_norm: float = 1.0                  # 勾配クリッピングの閾値
+    # 学習スケジュール
+    warmup_steps: int = 1000
     
-    # 層の凍結設定
-    freeze_audio_encoder: bool = True         # Audio Encoderを凍結
-    freeze_vision_encoder: bool = True         # Vision Encoderを凍結
-    freeze_cross_attention: bool = False        # Cross Attentionを凍結
+    # 保存設定
+    checkpoint_dir: str = "../checkpoints"
+    save_epoch: int = 1  # エポックごと
     
-    # データセットパス（学習用）
-    audio_dir_train: str = '../../Datasets/SpokenCOCO/'
-    image_dir_train: str = '../../Datasets/stair_captions/images/'
-    train_json_path: str = '../../Datasets/SpokenCOCO/SpokenCOCO_train_fixed.json'
+    # デバイス設定
+    device: str = "cuda:1"  # "cuda:0", "cuda:1", "cpu"
     
-    # データセットパス（評価用）
-    audio_dir_val: str = '../../Datasets/SpokenCOCO/'
-    image_dir_val: str = '../../Datasets/stair_captions/images/'
-    val_json_path: str = '../../Datasets/SpokenCOCO/SpokenCOCO_val_fixed.json'
-    
-    # モデル保存先
-    model_save_dir: str = '../model/'
+    # ログ設定
+    log_step: int = 100  # ステップごと
+    validate_epoch: int = 1  # エポックごと
 
 
-# ========================================
-# ユーティリティ関数
-# ========================================
-def move_data_to_device(data, device):
+def freeze_layers(model: VisionConditionedASR, config: TrainingConfig):
     """
-    バッチデータをGPU/CPUに転送
+    指定された層を凍結
     
     Args:
-        data: バッチデータ（辞書形式）
-        device: 転送先デバイス
-        
-    Returns:
-        デバイスに転送されたデータ
+        model: VisionConditionedASRモデル
+        config: 学習設定
     """
-    result = {}
-    for key, value in data.items():
-        if isinstance(value, torch.Tensor):
-            result[key] = value.to(device)
-        else:
-            result[key] = value
-    return result
+    print("\n" + "="*60)
+    print("Layer Freeze Configuration")
+    print("="*60)
+    
+    # Audio Encoderの凍結
+    if config.freeze_audio_encoder:
+        for param in model.audio_encoder.model.parameters():
+            param.requires_grad = False
+        print("✓ Audio Encoder (Wav2Vec2):    FROZEN")
+    else:
+        print("✓ Audio Encoder (Wav2Vec2):    Trainable")
+    
+    # Vision Encoderの凍結
+    if config.freeze_vision_encoder:
+        for param in model.vision_encoder.model.vision_model.parameters():
+            param.requires_grad = False
+        print("✓ Vision Encoder (CLIP):       FROZEN")
+    else:
+        print("✓ Vision Encoder (CLIP):       Trainable")
+    
+    # Cross Attentionの凍結
+    if config.freeze_cross_attention:
+        for param in model.cross_attention.parameters():
+            param.requires_grad = False
+        print("✓ Cross Attention:             FROZEN")
+    else:
+        print("✓ Cross Attention:             Trainable")
+    
+    # Classifierは常に学習可能
+    print("✓ Classifier (Linear):         Trainable (always)")
+    
+    # 学習可能なパラメータ数を表示
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    total_params = sum(p.numel() for p in model.parameters())
+    frozen_params = total_params - trainable_params
+    
+    print(f"\n{'='*60}")
+    print("Parameter Statistics:")
+    print(f"{'='*60}")
+    print(f"Trainable parameters:  {trainable_params:,} ({100 * trainable_params / total_params:.2f}%)")
+    print(f"Frozen parameters:     {frozen_params:,} ({100 * frozen_params / total_params:.2f}%)")
+    print(f"Total parameters:      {total_params:,}")
+    print(f"{'='*60}\n")
 
 
-def calculate_wer(reference, hypothesis):
-    """
-    WER (Word Error Rate) を計算
-    
-    単語レベルでの編集距離を用いて、音声認識の精度を評価します。
-    値が小さいほど精度が高いことを示します。
-    
-    Args:
-        reference: 正解テキスト
-        hypothesis: 予測テキスト
-    
-    Returns:
-        WER値（0.0〜1.0以上）
-    """
-    ref_words = reference.lower().split()
-    hyp_words = hypothesis.lower().split()
-    
-    # 編集距離行列を初期化
-    n_ref = len(ref_words)
-    n_hyp = len(hyp_words)
-    dist_matrix = [[0] * (n_hyp + 1) for _ in range(n_ref + 1)]
-    
-    # 境界条件
-    for i in range(n_ref + 1):
-        dist_matrix[i][0] = i
-    for j in range(n_hyp + 1):
-        dist_matrix[0][j] = j
-    
-    # 動的計画法で編集距離を計算
-    for i in range(1, n_ref + 1):
-        for j in range(1, n_hyp + 1):
-            if ref_words[i-1] == hyp_words[j-1]:
-                cost = 0
-            else:
-                cost = 1
-            
-            dist_matrix[i][j] = min(
-                dist_matrix[i-1][j] + 1,      # 削除
-                dist_matrix[i][j-1] + 1,      # 挿入
-                dist_matrix[i-1][j-1] + cost  # 置換
-            )
-    
-    # WERを計算（空文字列の場合の処理を含む）
-    if n_ref == 0:
-        return 0 if n_hyp == 0 else 1
-    
-    return dist_matrix[n_ref][n_hyp] / n_ref
-
-
-def set_seed(seed: int):
-    """
-    再現性のためにシード値を固定
-    
-    Args:
-        seed: 固定するシード値
-    """
-    print(f"\n[Seed] Setting random seed to {seed}")
-    
-    # Python標準のrandomモジュール
-    random.seed(seed)
-    
-    # NumPy
-    np.random.seed(seed)
-    
-    # PyTorch
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)  # マルチGPU対応
-    
-    # CuDNNの決定的動作を有効化（若干速度が低下する可能性あり）
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    
-    print("  ✓ Random seed has been set for reproducibility")
-    print("  ✓ CuDNN deterministic mode enabled")
-
-
-def decode_predictions(predicted_ids, tokenizer, pad_token_id):
+def decode_predictions(
+    predicted_ids: torch.Tensor, 
+    tokenizer,
+    blank_token_id: int = 0
+) -> List[str]:
     """
     CTCの予測結果をテキストにデコード
     
     Args:
         predicted_ids: 予測されたトークンID [batch, seq_len]
         tokenizer: トークナイザー
-        pad_token_id: パディングトークンのID
+        blank_token_id: CTCのblankトークンID（通常は0）
         
     Returns:
         デコードされたテキストのリスト
@@ -179,13 +130,22 @@ def decode_predictions(predicted_ids, tokenizer, pad_token_id):
     decoded_texts = []
     
     for pred_ids_seq in predicted_ids:
-        # CTCデコーディング：連続する同じトークンを除去
+        # CTCデコーディング：
+        # 1. blank tokenを除去
+        # 2. 連続する同じトークンを1つに統合（collapse）
         pred_tokens = []
         prev_token = None
         
         for token_id in pred_ids_seq.tolist():
-            if token_id != pad_token_id and token_id != prev_token:
+            # blank tokenはスキップ
+            if token_id == blank_token_id:
+                prev_token = None  # blankが出たらprev_tokenをリセット
+                continue
+            
+            # 連続する同じトークンは1つだけ保持
+            if token_id != prev_token:
                 pred_tokens.append(token_id)
+            
             prev_token = token_id
         
         # トークンをテキストに変換
@@ -195,525 +155,378 @@ def decode_predictions(predicted_ids, tokenizer, pad_token_id):
     return decoded_texts
 
 
-# ========================================
-# モデル設定関数
-# ========================================
-def freeze_layers(model, config):
+def compute_ctc_loss(
+    logits: torch.Tensor,
+    texts: List[str],
+    tokenizer,
+    wav_lengths: torch.Tensor
+) -> torch.Tensor:
     """
-    指定された層を凍結
+    CTC損失を計算
     
     Args:
-        model: VisionConditionedASRモデル
-        config: 学習設定
-    """
-    print("\n[Freeze] Layer freeze configuration:")
-    
-    # Audio Encoderの凍結
-    if config.freeze_audio_encoder:
-        for param in model.audio_encoder.parameters():
-            param.requires_grad = False
-        print("  ✓ Audio Encoder: FROZEN")
-    else:
-        print("  ✓ Audio Encoder: Trainable")
-    
-    # Vision Encoderの凍結
-    if config.freeze_vision_encoder:
-        for param in model.vision_encoder.parameters():
-            param.requires_grad = False
-        print("  ✓ Vision Encoder: FROZEN")
-    else:
-        print("  ✓ Vision Encoder: Trainable")
-    
-    # Cross Attentionの凍結
-    if config.freeze_cross_attention:
-        for param in model.cross_attention.parameters():
-            param.requires_grad = False
-        print("  ✓ Cross Attention: FROZEN")
-    else:
-        print("  ✓ Cross Attention: Trainable")
-    
-    # Classifierは常に学習可能
-    print("  ✓ Classifier: Trainable (always)")
-
-
-def get_optimizer(model, config):
-    """
-    パラメータグループごとに異なる学習率を設定したオプティマイザーを作成
-    
-    Args:
-        model: VisionConditionedASRモデル
-        config: 学習設定
-        
-    Returns:
-        オプティマイザー
-    """
-    param_groups = []
-    
-    # Audio Encoder
-    if not config.freeze_audio_encoder:
-        param_groups.append({
-            'params': model.audio_encoder.parameters(),
-            'lr': config.learning_rate_audio_encoder,
-            'name': 'audio_encoder'
-        })
-    
-    # Vision Encoder
-    if not config.freeze_vision_encoder:
-        param_groups.append({
-            'params': model.vision_encoder.parameters(),
-            'lr': config.learning_rate_vision_encoder,
-            'name': 'vision_encoder'
-        })
-    
-    # Cross Attention
-    if not config.freeze_cross_attention:
-        param_groups.append({
-            'params': model.cross_attention.parameters(),
-            'lr': config.learning_rate_cross_attention,
-            'name': 'cross_attention'
-        })
-    
-    # Classifier
-    param_groups.append({
-        'params': model.classifier.parameters(),
-        'lr': config.learning_rate_classifier,
-        'name': 'classifier'
-    })
-    
-    optimizer = optim.AdamW(param_groups)
-    
-    # 学習率の情報を表示
-    print("\n[Optimizer] Learning rate configuration:")
-    for group in param_groups:
-        print(f"  ✓ {group['name']}: lr={group['lr']:.2e}")
-    
-    return optimizer
-
-
-def get_scheduler(optimizer, config, total_steps):
-    """
-    ウォームアップ + コサインアニーリングスケジューラーを作成
-    
-    Args:
-        optimizer: オプティマイザー
-        config: 学習設定
-        total_steps: 総学習ステップ数
-        
-    Returns:
-        スケジューラー（使用しない場合はNone）
-    """
-    if not config.use_scheduler:
-        print("\n[Scheduler] No scheduler will be used")
-        return None
-    
-    # ウォームアップスケジューラー
-    warmup_scheduler = LinearLR(
-        optimizer,
-        start_factor=0.01,
-        end_factor=1.0,
-        total_iters=config.warmup_steps
-    )
-    
-    # コサインアニーリングスケジューラー
-    cosine_scheduler = CosineAnnealingLR(
-        optimizer,
-        T_max=total_steps - config.warmup_steps,
-        eta_min=1e-7
-    )
-    
-    # スケジューラーの組み合わせ
-    scheduler = SequentialLR(
-        optimizer,
-        schedulers=[warmup_scheduler, cosine_scheduler],
-        milestones=[config.warmup_steps]
-    )
-    
-    print("\n[Scheduler] Learning rate scheduler:")
-    print(f"  ✓ Warmup steps: {config.warmup_steps}")
-    print(f"  ✓ Total steps: {total_steps}")
-    print(f"  ✓ Type: Linear warmup + Cosine annealing")
-    
-    return scheduler
-
-
-# ========================================
-# 学習関数
-# ========================================
-def train_one_epoch(model, dataloader, optimizer, scheduler, ctc_loss, 
-                   tokenizer, config, device, epoch, global_step):
-    """
-    1エポック分の学習を実行
-    
-    Args:
-        model: 学習対象のモデル
-        dataloader: 学習データローダー
-        optimizer: オプティマイザー
-        scheduler: 学習率スケジューラー（Noneの場合もあり）
-        ctc_loss: CTC損失関数
+        logits: モデル出力 [B, T, vocab_size]
+        texts: ターゲットテキスト [B]
         tokenizer: トークナイザー
-        config: 学習設定
-        device: 実行デバイス
-        epoch: 現在のエポック番号
-        global_step: グローバルステップ数
-        
+        wav_lengths: 各音声の長さ [B]
+    
     Returns:
-        (平均損失, 更新されたglobal_step)
+        loss: CTC損失
+    """
+    batch_size = logits.size(0)
+    device = logits.device
+    
+    # ターゲットのトークン化
+    # CTCではスペース区切りの文字列が必要
+    target_ids = []
+    target_lengths = []
+    
+    for text in texts:
+        # テキストをトークンIDに変換
+        tokens = tokenizer.encode(text, add_special_tokens=False)
+        target_ids.extend(tokens)
+        target_lengths.append(len(tokens))
+    
+    # Tensorに変換
+    target_ids = torch.tensor(target_ids, dtype=torch.long, device=device)
+    target_lengths = torch.tensor(target_lengths, dtype=torch.long, device=device)
+    
+    # 入力長を計算（logitsのシーケンス長）
+    # Wav2Vec2は音声を約50倍圧縮するため、実際のシーケンス長はモデル出力から取得
+    input_lengths = torch.full((batch_size,), logits.size(1), dtype=torch.long, device=device)
+    
+    # CTCLossの計算
+    # logitsを [T, B, vocab_size] に転置
+    log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
+    log_probs = log_probs.transpose(0, 1)  # [T, B, vocab_size]
+    
+    ctc_loss = nn.CTCLoss(blank=0, reduction='mean', zero_infinity=True)
+    
+    try:
+        loss = ctc_loss(log_probs, target_ids, input_lengths, target_lengths)
+    except RuntimeError as e:
+        print(f"\n[Warning] CTC Loss calculation error: {e}")
+        print(f"  Input lengths: {input_lengths.tolist()}")
+        print(f"  Target lengths: {target_lengths.tolist()}")
+        # エラー時は大きな損失を返す
+        loss = torch.tensor(1e6, device=device, requires_grad=True)
+    
+    return loss
+
+
+def train_one_epoch(
+    model: VisionConditionedASR,
+    dataloader: DataLoader,
+    optimizer: torch.optim.Optimizer,
+    tokenizer,
+    device: torch.device,
+    epoch: int,
+    config: TrainingConfig
+):
+    """
+    1エポック分の学習
+    
+    Args:
+        model: モデル
+        dataloader: データローダー
+        optimizer: オプティマイザー
+        tokenizer: トークナイザー
+        device: デバイス
+        epoch: 現在のエポック番号
+        config: 学習設定
+    
+    Returns:
+        avg_loss: 平均損失
     """
     model.train()
-    total_loss = 0
-    optimizer.zero_grad()
+    total_loss = 0.0
+    num_batches = len(dataloader)
     
-    pbar = tqdm(dataloader, desc=f"Epoch {epoch+1}/{config.epochs} (Train)")
+    print(f"\n{'='*60}")
+    print(f"Epoch {epoch+1}/{config.num_epochs} - Training")
+    print(f"{'='*60}")
     
-    for batch_idx, batch in enumerate(pbar):
+    for batch_idx, batch in enumerate(dataloader):
         try:
-            # データをデバイスに転送
-            data = move_data_to_device(batch, device)
+            # データをデバイスに移動（wav_lengthsのみ）
+            wav_lengths = batch["wav_lengths"].to(device)
             
-            # ラベルの準備
-            labels = tokenizer(
-                data["text"], 
-                return_tensors="pt", 
-                padding=True
-            ).input_ids.to(device)
-            label_lengths = torch.sum(labels != tokenizer.pad_token_id, dim=1)
+            # Forward pass
+            logits = model(batch)  # [B, T, vocab_size]
             
-            # 順伝播
-            logits = model(data)
-            
-            # NaN or Inf check
+            # NaN/Infチェック
             if torch.isnan(logits).any() or torch.isinf(logits).any():
-                print(f"\n🚨🚨 CRITICAL ERROR: Logits contain NaN or Inf!")
-                print(f"  Max value: {logits.abs().max()}")
-                print(f"  Min value: {logits.abs().min()}")
-                raise RuntimeError("Model output (logits) is numerically unstable.")
+                print(f"\n🚨 CRITICAL: Logits contain NaN or Inf at batch {batch_idx}!")
+                print(f"  Skipping this batch...")
+                continue
             
             # CTC損失の計算
-            log_probs = torch.log_softmax(logits, dim=2).transpose(0, 1)
-            input_lengths = torch.full(
-                (logits.size(0),), 
-                logits.size(1), 
-                dtype=torch.long
-            ).to(device)
+            loss = compute_ctc_loss(logits, batch["text"], tokenizer, wav_lengths)
             
-            loss = ctc_loss(log_probs, labels, input_lengths, label_lengths)
+            # NaN/Infチェック
+            if torch.isnan(loss) or torch.isinf(loss):
+                print(f"\n🚨 CRITICAL: Loss is NaN or Inf at batch {batch_idx}!")
+                print(f"  Skipping this batch...")
+                continue
             
-            # 勾配累積のための正規化
-            loss = loss / config.gradient_accumulation_steps
-            
-            # 逆伝播
+            # Backward pass
+            optimizer.zero_grad()
             loss.backward()
             
-            # 損失の記録
-            total_loss += loss.item() * config.gradient_accumulation_steps
+            # Gradient clipping
+            torch.nn.utils.clip_grad_norm_(model.parameters(), config.gradient_clip)
             
-            # 進捗バーの更新（現在の学習率も表示）
-            current_lr = optimizer.param_groups[0]['lr']
-            pbar.set_postfix(
-                loss=loss.item() * config.gradient_accumulation_steps,
-                lr=f"{current_lr:.2e}"
-            )
+            optimizer.step()
             
-            # パラメータ更新（勾配累積ステップごと）
-            if (batch_idx + 1) % config.gradient_accumulation_steps == 0:
-                # 勾配クリッピング
-                torch.nn.utils.clip_grad_norm_(
-                    model.parameters(), 
-                    max_norm=config.max_grad_norm
-                )
-                
-                # パラメータ更新
-                optimizer.step()
-                optimizer.zero_grad()
-                
-                # スケジューラーの更新
-                if scheduler is not None:
-                    scheduler.step()
-                
-                # wandbへのロギング
-                if config.use_wandb and (global_step + 1) % 100 == 0:
-                    log_dict = {
-                        "train/batch_loss": loss.item() * config.gradient_accumulation_steps,
-                        "train/learning_rate": current_lr
-                    }
-                    wandb.log(log_dict, step=global_step)
-                
-                global_step += 1
+            # 損失の累積
+            total_loss += loss.item()
             
-            # メモリ管理
+            # ログ出力
+            if (batch_idx + 1) % config.log_step == 0 or (batch_idx + 1) == num_batches:
+                avg_loss = total_loss / (batch_idx + 1)
+                print(f"  [{epoch+1}][{batch_idx+1}/{num_batches}] "
+                      f"Loss: {loss.item():.4f} | Avg Loss: {avg_loss:.4f}")
+            
+            # メモリクリア
             if batch_idx % 50 == 0 and device.type == 'cuda':
                 torch.cuda.empty_cache()
-                
-        except Exception as e:
-            print(f"\n[Error] Batch {batch_idx} failed: {e}")
-            print(f"  Batch keys: {batch.keys()}")
-            if "wav" in batch:
-                print(f"  wav type: {type(batch['wav'])}")
-            if "image" in batch:
-                print(f"  image count: {len(batch['image'])}")
-            raise e
-    
-    # エポック終了時の残り勾配を適用
-    if len(dataloader) % config.gradient_accumulation_steps != 0:
-        torch.nn.utils.clip_grad_norm_(
-            model.parameters(), 
-            max_norm=config.max_grad_norm
-        )
-        optimizer.step()
-        optimizer.zero_grad()
-    
-    avg_loss = total_loss / len(dataloader)
-    return avg_loss, global_step
-
-
-def validate(model, dataloader, ctc_loss, tokenizer, device):
-    """
-    検証データでモデルを評価
-    
-    Args:
-        model: 評価対象のモデル
-        dataloader: 検証データローダー
-        ctc_loss: CTC損失関数
-        tokenizer: トークナイザー
-        device: 実行デバイス
         
-    Returns:
-        (平均損失, 平均WER)
-    """
-    model.eval()
-    total_loss = 0
-    total_wer = 0
+        except Exception as e:
+            print(f"\n[Error] Exception at batch {batch_idx}: {e}")
+            import traceback
+            traceback.print_exc()
+            continue
     
-    print("\n[Validation] Starting...")
+    avg_loss = total_loss / num_batches if num_batches > 0 else 0.0
     
-    with torch.no_grad():
-        for batch_idx, batch in enumerate(tqdm(dataloader, desc="Validation")):
-            try:
-                # データをデバイスに転送
-                data = move_data_to_device(batch, device)
-                
-                # ラベルの準備
-                labels = tokenizer(
-                    data["text"], 
-                    return_tensors="pt", 
-                    padding=True
-                ).input_ids.to(device)
-                label_lengths = torch.sum(labels != tokenizer.pad_token_id, dim=1)
-                
-                # 順伝播
-                logits = model(data)
-                
-                # 損失の計算
-                log_probs = torch.log_softmax(logits, dim=2).transpose(0, 1)
-                input_lengths = torch.full(
-                    (logits.size(0),), 
-                    logits.size(1), 
-                    dtype=torch.long
-                ).to(device)
-                
-                loss = ctc_loss(log_probs, labels, input_lengths, label_lengths)
-                total_loss += loss.item()
-                
-                # WERの計算
-                predicted_ids = torch.argmax(logits, dim=-1)
-                pred_texts = decode_predictions(
-                    predicted_ids, 
-                    tokenizer, 
-                    tokenizer.pad_token_id
-                )
-                
-                for pred_text, ref_text in zip(pred_texts, data["text"]):
-                    total_wer += calculate_wer(ref_text, pred_text)
-                
-                # メモリ管理
-                if batch_idx % 50 == 0 and device.type == 'cuda':
-                    torch.cuda.empty_cache()
-                    
-            except Exception as e:
-                print(f"\n[Error] Validation batch {batch_idx} failed: {e}")
-                continue
+    print(f"\n{'='*60}")
+    print(f"Epoch {epoch+1} Training Summary:")
+    print(f"  Average Loss: {avg_loss:.4f}")
+    print(f"{'='*60}\n")
     
-    avg_loss = total_loss / len(dataloader)
-    avg_wer = total_wer / len(dataloader.dataset)
-    
-    return avg_loss, avg_wer
+    return avg_loss
 
 
-def save_model(model, epoch, config):
+def validate(
+    model: VisionConditionedASR,
+    dataloader: DataLoader,
+    tokenizer,
+    device: torch.device,
+    epoch: int,
+    config: TrainingConfig,
+    num_examples: int = 3
+):
     """
-    モデルを保存
+    検証
     
     Args:
-        model: 保存するモデル
+        model: モデル
+        dataloader: 検証データローダー
+        tokenizer: トークナイザー
+        device: デバイス
         epoch: 現在のエポック番号
         config: 学習設定
+        num_examples: 表示する予測例の数
+    
+    Returns:
+        avg_loss: 平均損失
     """
-    save_path = os.path.join(
-        config.model_save_dir, 
-        f'vision_conditioned_asr_epoch_{epoch+1}.pth'
+    model.eval()
+    total_loss = 0.0
+    num_batches = 0
+    all_predictions = []
+    all_references = []
+    
+    print(f"\n{'='*60}")
+    print(f"Epoch {epoch+1}/{config.num_epochs} - Validation")
+    print(f"{'='*60}")
+    
+    with torch.no_grad():
+        for batch_idx, batch in enumerate(dataloader):
+            try:
+                # データをデバイスに移動
+                wav_lengths = batch["wav_lengths"].to(device)
+                
+                # Forward pass
+                logits = model(batch)
+                
+                # 損失計算
+                loss = compute_ctc_loss(logits, batch["text"], tokenizer, wav_lengths)
+                
+                if not (torch.isnan(loss) or torch.isinf(loss)):
+                    total_loss += loss.item()
+                    num_batches += 1
+                
+                # 予測のデコード
+                predicted_ids = torch.argmax(logits, dim=-1)
+                pred_texts = decode_predictions(predicted_ids, tokenizer, blank_token_id=0)
+                
+                # 結果の保存
+                all_predictions.extend(pred_texts)
+                all_references.extend(batch["text"])
+                
+            except Exception as e:
+                print(f"\n[Error] Exception at validation batch {batch_idx}: {e}")
+                continue
+    
+    avg_loss = total_loss / num_batches if num_batches > 0 else 0.0
+    
+    # 予測例を表示
+    print(f"\n{'='*60}")
+    print("Prediction Examples:")
+    print(f"{'='*60}")
+    
+    for i in range(min(num_examples, len(all_predictions))):
+        print(f"\nExample {i+1}:")
+        print(f"  Reference:  {all_references[i][:80]}")
+        print(f"  Prediction: {all_predictions[i][:80]}")
+    
+    print(f"\n{'='*60}")
+    print(f"Epoch {epoch+1} Validation Summary:")
+    print(f"  Average Loss: {avg_loss:.4f}")
+    print(f"  Total samples: {len(all_predictions)}")
+    print(f"{'='*60}\n")
+    
+    return avg_loss
+
+
+def save_checkpoint(
+    model: VisionConditionedASR,
+    optimizer: torch.optim.Optimizer,
+    epoch: int,
+    train_loss: float,
+    val_loss: float,
+    config: TrainingConfig
+):
+    """
+    チェックポイントを保存
+    
+    Args:
+        model: モデル
+        optimizer: オプティマイザー
+        epoch: エポック番号
+        train_loss: 訓練損失
+        val_loss: 検証損失
+        config: 学習設定
+    """
+    os.makedirs(config.checkpoint_dir, exist_ok=True)
+    
+    checkpoint_path = os.path.join(
+        config.checkpoint_dir,
+        f"checkpoint_epoch_{epoch+1}.pt"
     )
-    torch.save(model.state_dict(), save_path)
-    print(f"[Save] Model saved to {save_path}")
+    
+    torch.save({
+        'epoch': epoch,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'train_loss': train_loss,
+        'val_loss': val_loss,
+        'config': config
+    }, checkpoint_path)
+    
+    print(f"[Checkpoint] Saved to {checkpoint_path}")
 
 
-# ========================================
-# メイン関数
-# ========================================
 def main():
-    """メイン学習ループ"""
-    # 設定の読み込み
+    """メイン学習関数"""
+    # 設定の初期化
     config = TrainingConfig()
     
-    # シード値の設定
-    set_seed(config.seed)
-    
     # デバイスの設定
-    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
-    print(f"[Setup] Using device: {device}")
+    device = torch.device(config.device if torch.cuda.is_available() else "cpu")
+    print(f"\n{'='*60}")
+    print("Training Configuration")
+    print(f"{'='*60}")
+    print(f"Device: {device}")
+    print(f"Batch size: {config.batch_size}")
+    print(f"Learning rate: {config.learning_rate}")
+    print(f"Num epochs: {config.num_epochs}")
+    print(f"{'='*60}\n")
     
-    # モデル保存ディレクトリの作成
-    os.makedirs(config.model_save_dir, exist_ok=True)
-    
-    # wandbの初期化
-    if config.use_wandb:
-        wandb.init(project=config.wandb_project, config=config)
-        print(f"[Wandb] Logging enabled - Project: {config.wandb_project}")
-    else:
-        print("[Wandb] Logging disabled")
-    
-    # ========================================
-    # データセットの準備
-    # ========================================
-    print("\n[Dataset] Loading training data...")
-    train_dataset = SpokenCOCODataset(
-        json_path=config.train_json_path,
-        audio_dir=config.audio_dir_train,
-        image_dir=config.image_dir_train
-    )
-    
-    print("\n[Dataset] Loading validation data...")
-    val_dataset = SpokenCOCODataset(
-        json_path=config.val_json_path,
-        audio_dir=config.audio_dir_val,
-        image_dir=config.image_dir_val
-    )
-    
-    train_dataloader = DataLoader(
-        train_dataset,
-        batch_size=config.batch_size,
-        shuffle=True,
-        collate_fn=spokenCOCO_collate
-    )
-    
-    val_dataloader = DataLoader(
-        val_dataset,
-        batch_size=config.batch_size,
-        shuffle=False,
-        collate_fn=spokenCOCO_collate
-    )
-    
-    # ========================================
-    # モデル・最適化の準備
-    # ========================================
-    print("\n[Model] Initializing model and optimizer...")
-    
-    # トークナイザーと語彙サイズの取得
+    # トークナイザーの初期化
     tokenizer = AutoTokenizer.from_pretrained("facebook/wav2vec2-base-960h")
-    temp_model = AutoModelForCTC.from_pretrained("facebook/wav2vec2-base-960h")
-    vocab_size = temp_model.config.vocab_size
     
     # モデルの初期化
-    model = VisionConditionedASR(vocab_size=vocab_size).to(device)
+    print("[Setup] Initializing model...")
+    model = VisionConditionedASR(
+        vocab_size=config.vocab_size,
+        hidden_dim=config.hidden_dim,
+        num_heads=config.num_heads,
+        device=device
+    ).to(device)
     
-    # 層の凍結設定
+    # 層の凍結
     freeze_layers(model, config)
     
-    # オプティマイザーの作成（パラメータグループごとに異なる学習率）
-    optimizer = get_optimizer(model, config)
-    
-    # 総ステップ数の計算
-    steps_per_epoch = len(train_dataloader) // config.gradient_accumulation_steps
-    total_steps = steps_per_epoch * config.epochs
-    
-    # 学習率スケジューラーの作成
-    scheduler = get_scheduler(optimizer, config, total_steps)
-    
-    # 損失関数
-    ctc_loss = nn.CTCLoss(blank=tokenizer.pad_token_id)
-    
-    print(f"\n[Training] Training configuration:")
-    print(f"  ✓ Total epochs: {config.epochs}")
-    print(f"  ✓ Steps per epoch: {steps_per_epoch}")
-    print(f"  ✓ Total steps: {total_steps}")
-    print(f"  ✓ Gradient clipping: max_norm={config.max_grad_norm}")
-    
-    # ========================================
-    # 学習ループ
-    # ========================================
-    print("\n[Training] Starting training loop...")
-    global_step = 0
-    
-    for epoch in range(config.epochs):
-        print(f"\n{'='*60}")
-        print(f"Epoch {epoch+1}/{config.epochs}")
-        print(f"{'='*60}")
-        
-        # 学習フェーズ
-        avg_train_loss, global_step = train_one_epoch(
-            model=model,
-            dataloader=train_dataloader,
-            optimizer=optimizer,
-            scheduler=scheduler,
-            ctc_loss=ctc_loss,
-            tokenizer=tokenizer,
-            config=config,
-            device=device,
-            epoch=epoch,
-            global_step=global_step
-        )
-        
-        # 評価フェーズ
-        avg_val_loss, avg_wer = validate(
-            model=model,
-            dataloader=val_dataloader,
-            ctc_loss=ctc_loss,
-            tokenizer=tokenizer,
-            device=device
-        )
-        
-        # 結果のロギング
-        if config.use_wandb:
-            wandb.log({
-                "train/epoch_loss": avg_train_loss,
-                "val/loss": avg_val_loss,
-                "val/wer": avg_wer,
-                "epoch": epoch
-            })
-        
-        # 結果の表示
-        print(f"\n[Results] Epoch {epoch+1} Summary:")
-        print(f"  Train Loss: {avg_train_loss:.4f}")
-        print(f"  Val Loss:   {avg_val_loss:.4f}")
-        print(f"  Val WER:    {avg_wer:.4f}")
-        
-        # モデルの保存
-        save_model(model, epoch, config)
-    
-    # ========================================
-    # 最終モデルの保存
-    # ========================================
-    print("\n[Training] Training finished!")
-    final_save_path = os.path.join(
-        config.model_save_dir, 
-        'vision_conditioned_asr_final.pth'
+    # データローダーの作成
+    print("[Setup] Creating dataloaders...")
+    train_loader = create_dataloader(
+        json_path=config.train_json,
+        audio_dir=config.audio_dir,
+        image_dir=config.image_dir,
+        batch_size=config.batch_size,
+        shuffle=True,
+        num_workers=config.num_workers,
+        max_audio_length=config.max_audio_length,
+        validate_files=config.validate_files
     )
-    torch.save(model.state_dict(), final_save_path)
-    print(f"[Save] Final model saved to {final_save_path}")
     
-    # wandbの終了
-    if config.use_wandb:
-        wandb.finish()
-        print("[Wandb] Logging session finished")
+    val_loader = create_dataloader(
+        json_path=config.val_json,
+        audio_dir=config.audio_dir,
+        image_dir=config.image_dir,
+        batch_size=config.batch_size,
+        shuffle=False,
+        num_workers=config.num_workers,
+        max_audio_length=config.max_audio_length,
+        validate_files=config.validate_files
+    )
+    
+    # オプティマイザーの設定
+    optimizer = torch.optim.AdamW(
+        filter(lambda p: p.requires_grad, model.parameters()),
+        lr=config.learning_rate,
+        weight_decay=config.weight_decay
+    )
+    
+    # 学習ループ
+    print("\n" + "="*60)
+    print("Starting Training")
+    print("="*60 + "\n")
+    
+    best_val_loss = float('inf')
+    
+    for epoch in range(config.num_epochs):
+        # 訓練
+        train_loss = train_one_epoch(
+            model, train_loader, optimizer, tokenizer, device, epoch, config
+        )
+        
+        # 検証
+        if (epoch + 1) % config.validate_epoch == 0:
+            val_loss = validate(
+                model, val_loader, tokenizer, device, epoch, config
+            )
+            
+            # ベストモデルの保存
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                print(f"\n✨ New best validation loss: {best_val_loss:.4f}")
+                save_checkpoint(
+                    model, optimizer, epoch, train_loss, val_loss, config
+                )
+        
+        # 定期的なチェックポイント保存
+        if (epoch + 1) % config.save_epoch == 0:
+            save_checkpoint(
+                model, optimizer, epoch, train_loss, 
+                val_loss if 'val_loss' in locals() else 0.0, config
+            )
+    
+    print("\n" + "="*60)
+    print("Training Completed!")
+    print("="*60 + "\n")
 
 
 if __name__ == "__main__":
