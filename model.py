@@ -29,6 +29,12 @@ class AudioEncoder(nn.Module):
         
         # Wav2Vec2Modelを使用（CTCヘッドなし、メモリ効率化）
         self.model = Wav2Vec2Model.from_pretrained(model_name, force_download=True)
+
+        if hasattr(self.model, 'masked_spec_embed') and self.model.masked_spec_embed is not None:
+            if torch.isnan(self.model.masked_spec_embed).any():
+                print(f"🚨Detected NaN in 'masked_spec_embed'. Re-initializing with normal distribution.")
+                # 重みを標準正規分布で再初期化 (Wav2Vec2のデフォルト初期化に倣う)
+                nn.init.normal_(self.model.masked_spec_embed.data, mean=0.0, std=1.0)
         
         # 語彙サイズを取得（CTCモデルから一時的に取得）
         temp_ctc_model = AutoModelForCTC.from_pretrained(model_name, force_download=True)

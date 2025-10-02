@@ -58,7 +58,7 @@ class TrainingConfig:
     # ログ設定
     log_step: int = 50  # ステップごと
     validate_epoch: int = 1  # エポックごと
-    use_wandb: bool = True  # 💡追加: wandbの使用/不使用
+    use_wandb: bool = False  # 💡追加: wandbの使用/不使用
     # wandb設定
     wandb_project: str = "VisionConditionedASR" # 💡追加: wandbプロジェクト名
 
