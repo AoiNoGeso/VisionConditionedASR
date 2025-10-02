@@ -24,14 +24,14 @@ class AudioEncoder(nn.Module):
     def __init__(self, model_name="facebook/wav2vec2-base-960h", device=None):
         super().__init__()
         self.model_name = model_name
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.processor = AutoProcessor.from_pretrained(model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name, force_download=True)
+        self.processor = AutoProcessor.from_pretrained(model_name, force_download=True)
         
         # Wav2Vec2Modelを使用（CTCヘッドなし、メモリ効率化）
-        self.model = Wav2Vec2Model.from_pretrained(model_name)
+        self.model = Wav2Vec2Model.from_pretrained(model_name, force_download=True)
         
         # 語彙サイズを取得（CTCモデルから一時的に取得）
-        temp_ctc_model = AutoModelForCTC.from_pretrained(model_name)
+        temp_ctc_model = AutoModelForCTC.from_pretrained(model_name, force_download=True)
         self.vocab_size = temp_ctc_model.config.vocab_size
         del temp_ctc_model
         
