@@ -287,7 +287,7 @@ def create_dataloader(
         shuffle=shuffle,
         collate_fn=spokenCOCO_collate,
         num_workers=num_workers,
-        pin_memory=True  # GPU使用時の高速化
+        pin_memory=True
     )
     
     return dataloader

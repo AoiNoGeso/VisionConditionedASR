@@ -7,6 +7,8 @@ from datetime import datetime
 from dataclasses import dataclass
 from typing import Optional, List
 import numpy as np
+from tqdm import tqdm  # 💡追加: tqdmをインポート
+import wandb        # 💡追加: wandbをインポート
 
 from model import VisionConditionedASR
 from dataloader import create_dataloader
@@ -16,8 +18,8 @@ from dataloader import create_dataloader
 class TrainingConfig:
     """学習設定"""
     # データセット設定
-    train_json: str = "../../Datasets/SpokenCOCO/SpokenCOCO_train.json"
-    val_json: str = "../../Datasets/SpokenCOCO/SpokenCOCO_val.json"
+    train_json: str = "../../Datasets/SpokenCOCO/SpokenCOCO_train_fixed.json"
+    val_json: str = "../../Datasets/SpokenCOCO/SpokenCOCO_val_fixed.json"
     audio_dir: str = "../../Datasets/SpokenCOCO"
     image_dir: str = "../../Datasets/stair_captions/images"
     
@@ -29,7 +31,7 @@ class TrainingConfig:
     # 学習設定
     batch_size: int = 8
     num_epochs: int = 10
-    learning_rate: float = 1e-4
+    learning_rate: float = 1e-5
     weight_decay: float = 1e-5
     gradient_clip: float = 1.0
     
@@ -54,8 +56,11 @@ class TrainingConfig:
     device: str = "cuda:1"  # "cuda:0", "cuda:1", "cpu"
     
     # ログ設定
-    log_step: int = 100  # ステップごと
+    log_step: int = 50  # ステップごと
     validate_epoch: int = 1  # エポックごと
+    use_wandb: bool = False  # 💡追加: wandbの使用/不使用
+    # wandb設定
+    wandb_project: str = "VisionConditionedASR" # 💡追加: wandbプロジェクト名
 
 
 def freeze_layers(model: VisionConditionedASR, config: TrainingConfig):
@@ -246,7 +251,9 @@ def train_one_epoch(
     print(f"Epoch {epoch+1}/{config.num_epochs} - Training")
     print(f"{'='*60}")
     
-    for batch_idx, batch in enumerate(dataloader):
+    pbar = tqdm(dataloader, desc=f"Epoch {epoch+1} Train", total=num_batches)
+    
+    for batch_idx, batch in enumerate(pbar):
         try:
             # データをデバイスに移動（wav_lengthsのみ）
             wav_lengths = batch["wav_lengths"].to(device)
@@ -279,13 +286,26 @@ def train_one_epoch(
             optimizer.step()
             
             # 損失の累積
-            total_loss += loss.item()
+            current_loss = loss.item() # 💡追加: 現在の損失を取得
+            total_loss += current_loss
             
-            # ログ出力
+            # 💡修正: プログレスバーに損失を表示
+            pbar.set_postfix(loss=f"{current_loss:.4f}")
+            
+            # 💡修正: ログ出力 (tqdmがあるため詳細なログはwandbへ)
             if (batch_idx + 1) % config.log_step == 0 or (batch_idx + 1) == num_batches:
+                # ログ出力は残す
                 avg_loss = total_loss / (batch_idx + 1)
-                print(f"  [{epoch+1}][{batch_idx+1}/{num_batches}] "
-                      f"Loss: {loss.item():.4f} | Avg Loss: {avg_loss:.4f}")
+                # print(f"  [{epoch+1}][{batch_idx+1}/{num_batches}] "
+                #       f"Loss: {current_loss:.4f} | Avg Loss: {avg_loss:.4f}")
+
+                # 💡追加: wandbにステップごとの損失をログ
+                if config.use_wandb:
+                    wandb.log({
+                        "train/loss_step": current_loss,
+                        "train/avg_loss_step": avg_loss,
+                        "epoch": epoch,
+                    }, step=epoch * num_batches + batch_idx + 1)
             
             # メモリクリア
             if batch_idx % 50 == 0 and device.type == 'cuda':
@@ -298,6 +318,13 @@ def train_one_epoch(
             continue
     
     avg_loss = total_loss / num_batches if num_batches > 0 else 0.0
+    
+    # 💡追加: wandbにエポックごとの平均損失をログ
+    if config.use_wandb:
+        wandb.log({
+            "train/loss_epoch": avg_loss,
+            "epoch": epoch,
+        })
     
     print(f"\n{'='*60}")
     print(f"Epoch {epoch+1} Training Summary:")
@@ -341,8 +368,11 @@ def validate(
     print(f"Epoch {epoch+1}/{config.num_epochs} - Validation")
     print(f"{'='*60}")
     
+    # 💡修正: tqdmでデータローダーをラップ
+    pbar = tqdm(dataloader, desc=f"Epoch {epoch+1} Val", total=len(dataloader))
+    
     with torch.no_grad():
-        for batch_idx, batch in enumerate(dataloader):
+        for batch_idx, batch in enumerate(pbar): # 💡修正: pbarを使用
             try:
                 # データをデバイスに移動
                 wav_lengths = batch["wav_lengths"].to(device)
@@ -354,8 +384,12 @@ def validate(
                 loss = compute_ctc_loss(logits, batch["text"], tokenizer, wav_lengths)
                 
                 if not (torch.isnan(loss) or torch.isinf(loss)):
-                    total_loss += loss.item()
+                    current_loss = loss.item() # 💡追加: 現在の損失を取得
+                    total_loss += current_loss
                     num_batches += 1
+                    
+                    # 💡修正: プログレスバーに損失を表示
+                    pbar.set_postfix(loss=f"{current_loss:.4f}")
                 
                 # 予測のデコード
                 predicted_ids = torch.argmax(logits, dim=-1)
@@ -376,10 +410,25 @@ def validate(
     print("Prediction Examples:")
     print(f"{'='*60}")
     
+    prediction_table = [] # 💡追加: wandb用テーブル
     for i in range(min(num_examples, len(all_predictions))):
+        ref = all_references[i][:80]
+        pred = all_predictions[i][:80]
         print(f"\nExample {i+1}:")
-        print(f"  Reference:  {all_references[i][:80]}")
-        print(f"  Prediction: {all_predictions[i][:80]}")
+        print(f"  Reference:  {ref}")
+        print(f"  Prediction: {pred}")
+        prediction_table.append([i+1, ref, pred]) # 💡追加: wandb用データ追加
+        
+    # 💡追加: wandbに検証結果をログ
+    if config.use_wandb:
+        wandb.log({
+            "val/loss_epoch": avg_loss,
+            "val/prediction_examples": wandb.Table(
+                data=prediction_table, 
+                columns=["Example", "Reference", "Prediction"]
+            ),
+            "epoch": epoch,
+        })
     
     print(f"\n{'='*60}")
     print(f"Epoch {epoch+1} Validation Summary:")
@@ -433,6 +482,14 @@ def main():
     # 設定の初期化
     config = TrainingConfig()
     
+    # 💡追加: wandbの初期化
+    if config.use_wandb:
+        print("[Setup] Initializing wandb...")
+        wandb.init(
+            project=config.wandb_project,
+            config=config.__dict__ # 設定をログ
+        )
+    
     # デバイスの設定
     device = torch.device(config.device if torch.cuda.is_available() else "cpu")
     print(f"\n{'='*60}")
@@ -442,6 +499,7 @@ def main():
     print(f"Batch size: {config.batch_size}")
     print(f"Learning rate: {config.learning_rate}")
     print(f"Num epochs: {config.num_epochs}")
+    print(f"Use wandb: {config.use_wandb}") # 💡追加: wandb設定の表示
     print(f"{'='*60}\n")
     
     # トークナイザーの初期化
@@ -504,6 +562,7 @@ def main():
         )
         
         # 検証
+        val_loss = 0.0 # 💡修正: val_lossの初期化
         if (epoch + 1) % config.validate_epoch == 0:
             val_loss = validate(
                 model, val_loader, tokenizer, device, epoch, config
@@ -519,14 +578,18 @@ def main():
         
         # 定期的なチェックポイント保存
         if (epoch + 1) % config.save_epoch == 0:
+            # 💡修正: val_lossが未定義の場合の処理を修正
             save_checkpoint(
-                model, optimizer, epoch, train_loss, 
-                val_loss if 'val_loss' in locals() else 0.0, config
+                model, optimizer, epoch, train_loss, val_loss, config
             )
     
     print("\n" + "="*60)
     print("Training Completed!")
     print("="*60 + "\n")
+    
+    # 💡追加: wandbの終了
+    if config.use_wandb:
+        wandb.finish()
 
 
 if __name__ == "__main__":

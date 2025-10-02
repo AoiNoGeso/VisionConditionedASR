@@ -1,0 +1,127 @@
+
+============================================================
+Training Configuration
+============================================================
+Device: cuda:1
+Batch size: 8
+Learning rate: 0.0001
+Num epochs: 10
+Use wandb: True
+============================================================
+
+[Setup] Initializing model...
+Some weights of Wav2Vec2Model were not initialized from the model checkpoint at facebook/wav2vec2-base-960h and are newly initialized: ['masked_spec_embed']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+Some weights of Wav2Vec2ForCTC were not initialized from the model checkpoint at facebook/wav2vec2-base-960h and are newly initialized: ['wav2vec2.masked_spec_embed']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+[Model] Auto-detected vocab_size: 32
+
+============================================================
+Layer Freeze Configuration
+============================================================
+✓ Audio Encoder (Wav2Vec2):    FROZEN
+✓ Vision Encoder (CLIP):       FROZEN
+✓ Cross Attention:             Trainable
+✓ Classifier (Linear):         Trainable (always)
+
+============================================================
+Parameter Statistics:
+============================================================
+Trainable parameters:  65,161,249 (26.56%)
+Frozen parameters:     180,171,136 (73.44%)
+Total parameters:      245,332,385
+============================================================
+
+[Setup] Creating dataloaders...
+
+[Dataset] Loading data with file validation...
+
+[Dataset] Loading statistics:
+  Total items in JSON:     592012
+  Missing image files:     0
+  Missing audio files:     0
+  Valid items loaded:      592012
+  Success rate:            100.00%
+
+[Dataset] Loading data with file validation...
+
+[Dataset] Loading statistics:
+  Total items in JSON:     24980
+  Missing image files:     0
+  Missing audio files:     0
+  Valid items loaded:      24980
+  Success rate:            100.00%
+
+============================================================
+Starting Training
+============================================================
+
+
+============================================================
+Epoch 1/10 - Training
+============================================================
+Epoch 1 Train:   0%|                                                                                                                 | 16/74002 [00:04<6:07:52,  3.35it/s, loss=8.5159]
+  Processed audio input shape: torch.Size([8, 101035])
+  Processed audio input shape: torch.Size([8, 132437])
+  Processed audio input shape: torch.Size([8, 77824])
+  Processed audio input shape: torch.Size([8, 133747])
+  Processed audio input shape: torch.Size([8, 90651])
+  Processed audio input shape: torch.Size([8, 90112])
+  Processed audio input shape: torch.Size([8, 114428])
+  Processed audio input shape: torch.Size([8, 114688])
+  Processed audio input shape: torch.Size([8, 92843])
+  Processed audio input shape: torch.Size([8, 92843])
+  Processed audio input shape: torch.Size([8, 126976])
+  Processed audio input shape: torch.Size([8, 118886])
+  Processed audio input shape: torch.Size([8, 105511])
+  Processed audio input shape: torch.Size([8, 107861])
+  Processed audio input shape: torch.Size([8, 126976])
+  Processed audio input shape: torch.Size([8, 136533])
+  Processed audio input shape: torch.Size([8, 87381])
+Traceback (most recent call last):
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 596, in <module>
+    main()
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 560, in main
+    train_loss = train_one_epoch(
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 85, in forward
+    audio_outputs = self.model(
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/transformers/models/wav2vec2/modeling_wav2vec2.py", line 1467, in forward
+    encoder_outputs = self.encoder(
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/transformers/models/wav2vec2/modeling_wav2vec2.py", line 718, in forward
+    position_embeddings = self.pos_conv_embed(hidden_states)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/transformers/models/wav2vec2/modeling_wav2vec2.py", line 377, in forward
+    hidden_states = self.conv(hidden_states)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/conv.py", line 371, in forward
+    return self._conv_forward(input, self.weight, self.bias)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/conv.py", line 366, in _conv_forward
+    return F.conv1d(
+KeyboardInterrupt

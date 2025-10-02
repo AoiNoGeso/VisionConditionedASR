@@ -1,0 +1,78 @@
+
+============================================================
+Training Configuration
+============================================================
+Device: cuda:1
+Batch size: 8
+Learning rate: 0.0001
+Num epochs: 10
+Use wandb: True
+============================================================
+
+[Setup] Initializing model...
+Some weights of Wav2Vec2Model were not initialized from the model checkpoint at facebook/wav2vec2-base-960h and are newly initialized: ['masked_spec_embed']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+Some weights of Wav2Vec2ForCTC were not initialized from the model checkpoint at facebook/wav2vec2-base-960h and are newly initialized: ['wav2vec2.masked_spec_embed']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+[Model] Auto-detected vocab_size: 32
+
+============================================================
+Layer Freeze Configuration
+============================================================
+✓ Audio Encoder (Wav2Vec2):    FROZEN
+✓ Vision Encoder (CLIP):       FROZEN
+✓ Cross Attention:             Trainable
+✓ Classifier (Linear):         Trainable (always)
+
+============================================================
+Parameter Statistics:
+============================================================
+Trainable parameters:  65,161,249 (26.56%)
+Frozen parameters:     180,171,136 (73.44%)
+Total parameters:      245,332,385
+============================================================
+
+[Setup] Creating dataloaders...
+
+[Dataset] Loading data with file validation...
+
+[Dataset] Loading statistics:
+  Total items in JSON:     592012
+  Missing image files:     0
+  Missing audio files:     0
+  Valid items loaded:      592012
+  Success rate:            100.00%
+
+[Dataset] Loading data with file validation...
+
+[Dataset] Loading statistics:
+  Total items in JSON:     24980
+  Missing image files:     0
+  Missing audio files:     0
+  Valid items loaded:      24980
+  Success rate:            100.00%
+
+============================================================
+Starting Training
+============================================================
+
+
+============================================================
+Epoch 1/10 - Training
+============================================================
+Epoch 1 Train:   1%|▍                                                                       | 422/74002 [01:27<4:13:32,  4.84it/s, loss=3.9678]
+Traceback (most recent call last):
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 596, in <module>
+    main()
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 560, in main
+    train_loss = train_one_epoch(
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 281, in train_one_epoch
+    loss.backward()
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/_tensor.py", line 647, in backward
+    torch.autograd.backward(
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/autograd/__init__.py", line 354, in backward
+    _engine_run_backward(
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/autograd/graph.py", line 829, in _engine_run_backward
+    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+KeyboardInterrupt

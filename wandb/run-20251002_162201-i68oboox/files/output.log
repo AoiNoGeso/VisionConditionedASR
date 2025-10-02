@@ -1,0 +1,730 @@
+
+============================================================
+Training Configuration
+============================================================
+Device: cuda:1
+Batch size: 8
+Learning rate: 0.0001
+Num epochs: 10
+Use wandb: True
+============================================================
+
+[Setup] Initializing model...
+Some weights of Wav2Vec2Model were not initialized from the model checkpoint at facebook/wav2vec2-base-960h and are newly initialized: ['masked_spec_embed']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+Some weights of Wav2Vec2ForCTC were not initialized from the model checkpoint at facebook/wav2vec2-base-960h and are newly initialized: ['wav2vec2.masked_spec_embed']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+[Model] Auto-detected vocab_size: 32
+
+============================================================
+Layer Freeze Configuration
+============================================================
+✓ Audio Encoder (Wav2Vec2):    FROZEN
+✓ Vision Encoder (CLIP):       FROZEN
+✓ Cross Attention:             Trainable
+✓ Classifier (Linear):         Trainable (always)
+
+============================================================
+Parameter Statistics:
+============================================================
+Trainable parameters:  65,161,249 (26.56%)
+Frozen parameters:     180,171,136 (73.44%)
+Total parameters:      245,332,385
+============================================================
+
+[Setup] Creating dataloaders...
+
+[Dataset] Loading data with file validation...
+
+[Dataset] Loading statistics:
+  Total items in JSON:     592012
+  Missing image files:     0
+  Missing audio files:     0
+  Valid items loaded:      592012
+  Success rate:            100.00%
+
+[Dataset] Loading data with file validation...
+
+[Dataset] Loading statistics:
+  Total items in JSON:     24980
+  Missing image files:     0
+  Missing audio files:     0
+  Valid items loaded:      24980
+  Success rate:            100.00%
+
+============================================================
+Starting Training
+============================================================
+
+
+============================================================
+Epoch 1/10 - Training
+============================================================
+Epoch 1 Train:   0%|                                                                                                                                         | 0/74002 [00:00<?, ?it/s]Traceback (most recent call last):
+  Processed audio input: tensor([[ 6.7066e-03,  6.3455e-03,  5.6233e-03,  ..., -5.1562e-04,
+         -5.1562e-04, -5.1562e-04],
+        [ 6.0215e-04,  1.0823e-03,  1.2200e-04,  ...,  1.2200e-04,
+          1.2200e-04,  1.2200e-04],
+        [-1.5509e-03, -1.2083e-03, -1.8936e-03,  ..., -1.2083e-03,
+         -1.2083e-03, -1.2083e-03],
+        ...,
+        [ 8.7433e-03,  1.3817e-02,  8.7433e-03,  ..., -1.3491e-04,
+         -1.3491e-04, -1.3491e-04],
+        [ 1.4530e-04,  1.4530e-04, -1.0792e-04,  ...,  1.4530e-04,
+          1.4530e-04,  1.4530e-04],
+        [-5.9865e-04, -5.9865e-04,  9.9066e-05,  ...,  9.9066e-05,
+          9.9066e-05,  9.9066e-05]], device='cuda:1')
+
+[Error] Exception at batch 0: Audio features contain NaN values
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+Epoch 1 Train:   0%|                                                                                                                              | 1/74002 [00:01<23:05:11,  1.12s/it]Traceback (most recent call last):
+  Processed audio input: tensor([[ 1.6929e-03,  4.4718e-03,  2.0403e-03,  ...,  3.0342e-04,
+          3.0342e-04,  3.0342e-04],
+        [ 2.9560e-02,  3.4446e-02,  3.4002e-02,  ..., -6.4063e-04,
+         -6.4063e-04, -6.4063e-04],
+        [-5.8599e-02, -1.1002e-02,  1.1559e-01,  ...,  1.1507e-03,
+          1.1507e-03,  1.1507e-03],
+        ...,
+        [-1.4721e-01, -2.2305e-01, -1.9517e-01,  ...,  2.7085e-04,
+          2.7085e-04,  2.7085e-04],
+        [ 2.3654e-03,  4.6449e-03,  4.6449e-03,  ...,  8.5834e-05,
+          8.5834e-05,  8.5834e-05],
+        [ 1.7396e-03,  2.2455e-04,  2.2455e-04,  ...,  2.2455e-04,
+          2.2455e-04,  2.2455e-04]], device='cuda:1')
+
+[Error] Exception at batch 1: Audio features contain NaN values
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+  Processed audio input: tensor([[-3.0773e-05, -3.0773e-05,  5.7278e-04,  ..., -3.0773e-05,
+         -3.0773e-05, -3.0773e-05],
+        [ 2.7572e-04,  1.0920e-03,  1.6361e-03,  ...,  3.6476e-06,
+          3.6476e-06,  3.6476e-06],
+        [-1.0738e-03, -2.0953e-03, -1.7548e-03,  ...,  2.8811e-04,
+          2.8811e-04,  2.8811e-04],
+        ...,
+        [-3.4336e-03, -2.3712e-03,  1.8784e-03,  ..., -2.4638e-04,
+         -2.4638e-04, -2.4638e-04],
+        [-2.2598e-02, -4.7959e-02, -4.5846e-02,  ..., -7.5852e-04,
+         -7.5852e-04, -7.5852e-04],
+        [ 1.7225e-02,  4.3134e-04, -2.1116e-02,  ..., -2.0240e-04,
+         -2.0240e-04, -2.0240e-04]], device='cuda:1')
+
+[Error] Exception at batch 2: Audio features contain NaN values
+Traceback (most recent call last):
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+Epoch 1 Train:   0%|                                                                                                                               | 3/74002 [00:01<7:01:37,  2.93it/s]Traceback (most recent call last):
+  Processed audio input: tensor([[ 5.3077e-04,  8.6221e-05,  1.4199e-03,  ...,  8.6221e-05,
+          8.6221e-05,  8.6221e-05],
+        [ 5.8098e-04,  5.8098e-04,  5.8098e-04,  ...,  5.8098e-04,
+          5.8098e-04,  5.8098e-04],
+        [-1.5163e-02, -2.3461e-02, -1.5163e-02,  ...,  1.4331e-03,
+          1.4331e-03,  1.4331e-03],
+        ...,
+        [-4.7283e-04,  6.0245e-03,  9.4642e-03,  ...,  2.9156e-04,
+          2.9156e-04,  2.9156e-04],
+        [ 2.2495e-02,  1.2927e-02,  2.2495e-02,  ..., -6.2086e-03,
+          3.3592e-03,  3.3592e-03],
+        [ 8.1470e-02,  1.3152e-01,  3.3751e-02,  ...,  2.8993e-04,
+          2.8993e-04,  2.8993e-04]], device='cuda:1')
+
+[Error] Exception at batch 3: Audio features contain NaN values
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+Epoch 1 Train:   0%|                                                                                                                               | 4/74002 [00:01<5:23:31,  3.81it/s]Traceback (most recent call last):
+  Processed audio input: tensor([[-1.4858e-02, -1.3968e-02, -9.5176e-03,  ...,  2.7276e-04,
+          2.7276e-04,  2.7276e-04],
+        [-2.8057e-04,  6.7465e-05,  6.7465e-05,  ...,  6.7465e-05,
+          6.7465e-05,  6.7465e-05],
+        [-1.3970e-03, -1.6711e-03, -8.4876e-04,  ..., -1.1229e-03,
+         -5.7465e-04, -8.4876e-04],
+        ...,
+        [ 4.1408e-02,  4.1408e-02,  4.1408e-02,  ...,  1.7762e-02,
+          1.7762e-02,  1.7762e-02],
+        [ 9.4383e-03,  1.2397e-02,  3.9910e-02,  ...,  2.6725e-04,
+          2.6725e-04,  2.6725e-04],
+        [ 3.9352e-04,  3.9352e-04,  3.9352e-04,  ...,  3.9352e-04,
+          3.9352e-04,  3.9352e-04]], device='cuda:1')
+
+[Error] Exception at batch 4: Audio features contain NaN values
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+  Processed audio input: tensor([[-1.5397e-03, -5.8107e-03, -2.3939e-03,  ...,  1.6866e-04,
+          1.6866e-04,  1.6866e-04],
+        [ 3.1952e-02,  5.6593e-02,  5.0346e-02,  ..., -3.0866e-02,
+         -5.7936e-02, -5.0995e-02],
+        [-1.2272e-01, -1.9987e-01, -1.6769e-01,  ..., -2.5330e-05,
+         -2.5330e-05, -2.5330e-05],
+        ...,
+        [ 1.1732e-03, -7.6600e-03,  3.0135e-03,  ...,  1.1732e-03,
+          1.1732e-03,  1.1732e-03],
+        [-4.5948e-02, -1.9712e-02, -2.5542e-02,  ...,  6.9449e-04,
+          6.9449e-04,  6.9449e-04],
+        [-8.4582e-04,  1.1036e-03,  3.7028e-03,  ..., -8.4582e-04,
+         -8.4582e-04, -8.4582e-04]], device='cuda:1')
+
+[Error] Exception at batch 5: Audio features contain NaN values
+Traceback (most recent call last):
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+Epoch 1 Train:   0%|                                                                                                                               | 6/74002 [00:01<3:26:32,  5.97it/s]Traceback (most recent call last):
+  Processed audio input: tensor([[ 2.9991e-04, -1.0711e-03, -1.0668e-02,  ...,  2.9991e-04,
+          2.9991e-04,  2.9991e-04],
+        [ 2.2304e-05,  2.2304e-05, -2.7436e-04,  ...,  2.2304e-05,
+          2.2304e-05,  2.2304e-05],
+        [ 2.7236e-02,  3.9142e-02,  1.2804e-02,  ...,  1.7599e-04,
+          1.7599e-04,  1.7599e-04],
+        ...,
+        [ 7.6312e-03,  1.2074e-02,  1.9193e-03,  ...,  1.5305e-05,
+          1.5305e-05,  1.5305e-05],
+        [ 6.6223e-05, -3.3032e-04,  6.6223e-05,  ...,  6.6223e-05,
+          6.6223e-05,  6.6223e-05],
+        [ 2.8243e-02,  4.7932e-03, -5.8857e-02,  ...,  2.4893e-02,
+          2.4893e-02,  2.4893e-02]], device='cuda:1')
+
+[Error] Exception at batch 6: Audio features contain NaN values
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+  Processed audio input: tensor([[-1.1679e-02, -2.1704e-02, -3.1729e-02,  ..., -5.9810e-04,
+         -5.9810e-04, -5.9810e-04],
+        [ 7.1121e-02,  8.2626e-02,  3.4362e-02,  ...,  6.8846e-04,
+          6.8846e-04,  6.8846e-04],
+        [ 3.2506e-03, -3.5571e-05, -3.5571e-05,  ..., -3.5571e-05,
+         -3.5571e-05, -3.5571e-05],
+        ...,
+        [-6.4217e-04, -5.5711e-06, -3.2387e-04,  ..., -5.5711e-06,
+         -5.5711e-06, -5.5711e-06],
+        [ 1.7792e-04, -1.8446e-03, -8.3336e-04,  ...,  1.7792e-04,
+          1.7792e-04,  1.7792e-04],
+        [ 1.1240e-03,  2.0035e-03,  2.2966e-03,  ...,  1.1385e-02,
+          1.1092e-02,  1.2264e-02]], device='cuda:1')
+
+[Error] Exception at batch 7: Audio features contain NaN values
+Traceback (most recent call last):
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+Epoch 1 Train:   0%|                                                                                                                               | 8/74002 [00:01<2:36:46,  7.87it/s]Traceback (most recent call last):
+  Processed audio input: tensor([[-8.2800e-02, -8.5028e-02,  8.8051e-02,  ...,  2.5615e-05,
+          2.5615e-05,  2.5615e-05],
+        [-5.1480e-03, -4.3267e-03, -1.4521e-03,  ...,  1.9048e-04,
+          1.9048e-04,  1.9048e-04],
+        [-8.6938e-03, -7.1087e-03, -1.3593e-02,  ..., -4.8030e-03,
+         -4.8030e-03, -4.8030e-03],
+        ...,
+        [ 3.1418e-04,  2.9938e-06, -3.0819e-04,  ...,  2.9938e-06,
+          2.9938e-06,  2.9938e-06],
+        [-8.8092e-04, -1.1732e-03, -8.8092e-04,  ..., -3.9695e-06,
+         -3.9695e-06, -3.9695e-06],
+        [ 1.3701e-03,  1.5937e-03,  1.5937e-03,  ...,  1.5937e-03,
+          2.5205e-04, -6.4240e-04]], device='cuda:1')
+
+[Error] Exception at batch 8: Audio features contain NaN values
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+  Processed audio input: tensor([[ 7.9091e-04,  7.9091e-04,  7.9091e-04,  ...,  7.9091e-04,
+          7.9091e-04,  7.9091e-04],
+        [ 3.4532e-01,  5.7248e-01,  4.9812e-01,  ..., -1.0843e-06,
+         -1.0843e-06, -1.0843e-06],
+        [ 1.1932e-03,  6.7784e-04,  4.2857e-03,  ...,  4.2014e-04,
+          4.2014e-04,  4.2014e-04],
+        ...,
+        [-2.8088e-03, -3.2269e-03, -1.1366e-03,  ...,  1.1755e-04,
+          1.1755e-04,  1.1755e-04],
+        [-1.1205e-03, -8.3621e-04, -5.5195e-04,  ...,  1.6580e-05,
+          1.6580e-05,  1.6580e-05],
+        [-7.9446e-02, -1.1028e-01, -3.9026e-02,  ...,  2.4738e-05,
+          2.4738e-05,  2.4738e-05]], device='cuda:1')
+
+[Error] Exception at batch 9: Audio features contain NaN values
+Traceback (most recent call last):
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+Epoch 1 Train:   0%|                                                                                                                              | 10/74002 [00:01<2:12:47,  9.29it/s]Traceback (most recent call last):
+  Processed audio input: tensor([[-3.3448e-03, -8.5100e-03, -5.9274e-03,  ...,  9.8765e-05,
+          9.8765e-05,  9.8765e-05],
+        [ 1.2223e-02,  2.1494e-02,  1.9507e-02,  ...,  3.0309e-04,
+          3.0309e-04,  3.0309e-04],
+        [-1.9890e-04,  7.0216e-05, -1.9890e-04,  ...,  7.0216e-05,
+          7.0216e-05,  7.0216e-05],
+        ...,
+        [-1.9574e-02, -2.2884e-02, -9.9432e-03,  ..., -1.1537e-05,
+          2.2259e-02,  2.6172e-02],
+        [ 8.9821e-03,  5.7519e-03, -7.0856e-04,  ...,  1.8295e-03,
+          1.8295e-03,  1.8295e-03],
+        [ 3.6415e-02,  6.3310e-02,  5.8125e-02,  ...,  4.4746e-04,
+          4.4746e-04,  4.4746e-04]], device='cuda:1')
+
+[Error] Exception at batch 10: Audio features contain NaN values
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+  Processed audio input: tensor([[-0.0004, -0.0008, -0.0004,  ...,  0.0004,  0.0004,  0.0004],
+        [ 0.0345,  0.0584,  0.0539,  ...,  0.0003,  0.0003,  0.0003],
+        [-0.0237,  0.0448, -0.0022,  ..., -0.0007, -0.0007, -0.0007],
+        ...,
+        [-0.0082,  0.0098,  0.0022,  ...,  0.0001,  0.0001,  0.0001],
+        [ 0.0012,  0.0003,  0.0012,  ...,  0.0003,  0.0003,  0.0003],
+        [-0.0011,  0.0073,  0.0090,  ...,  0.0006,  0.0006,  0.0006]],
+       device='cuda:1')
+
+[Error] Exception at batch 11: Audio features contain NaN values
+Traceback (most recent call last):
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+Epoch 1 Train:   0%|                                                                                                                              | 12/74002 [00:01<2:02:31, 10.06it/s]Traceback (most recent call last):
+  Processed audio input: tensor([[ 1.8098e-04,  1.8098e-04,  1.8098e-04,  ...,  1.8098e-04,
+          1.8098e-04,  1.8098e-04],
+        [-1.5458e-02, -2.6978e-02, -2.5422e-02,  ...,  1.0916e-04,
+          1.0916e-04,  1.0916e-04],
+        [ 1.0356e-02, -3.7933e-03, -8.5096e-03,  ...,  9.2309e-04,
+          9.2309e-04,  9.2309e-04],
+        ...,
+        [-5.6650e-03, -9.4647e-03, -9.4647e-03,  ...,  3.0608e-04,
+          3.0608e-04,  3.0608e-04],
+        [ 3.8089e-03,  6.7219e-03,  4.1002e-03,  ..., -5.6063e-04,
+         -5.6063e-04, -5.6063e-04],
+        [ 5.9818e-02,  1.9271e-01,  3.3521e-01,  ...,  4.2086e-04,
+          4.2086e-04,  4.2086e-04]], device='cuda:1')
+
+[Error] Exception at batch 12: Audio features contain NaN values
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+  Processed audio input: tensor([[-2.3600e-04, -2.3600e-04, -5.7039e-04,  ..., -2.3600e-04,
+         -2.3600e-04, -2.3600e-04],
+        [ 1.6927e-03,  8.7569e-04, -3.4982e-04,  ...,  5.8683e-05,
+          5.8683e-05,  5.8683e-05],
+        [-7.7930e-03, -1.0901e-02, -1.2660e-03,  ...,  1.2205e-03,
+          1.2205e-03,  1.2205e-03],
+        ...,
+        [ 1.8706e-04, -1.4895e-03,  1.8706e-04,  ...,  1.8706e-04,
+          1.8706e-04,  1.8706e-04],
+        [-3.2271e-02,  4.9973e-02,  4.0104e-02,  ...,  2.1523e-04,
+          2.1523e-04,  2.1523e-04],
+        [-3.5138e-02, -1.5131e-02,  3.2031e-02,  ...,  1.1357e-04,
+          1.1357e-04,  1.1357e-04]], device='cuda:1')
+
+[Error] Exception at batch 13: Audio features contain NaN values
+Traceback (most recent call last):
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+Epoch 1 Train:   0%|                                                                                                                              | 14/74002 [00:02<1:54:03, 10.81it/s]Traceback (most recent call last):
+  Processed audio input: tensor([[ 4.1265e-03,  2.7053e-03, -1.3711e-04,  ...,  2.7053e-03,
+          2.7053e-03,  2.7053e-03],
+        [-8.6110e-05,  3.6912e-04,  1.2796e-03,  ..., -5.4134e-04,
+         -7.6896e-04, -8.6110e-05],
+        [-2.0798e-03, -1.1164e-02, -1.1164e-02,  ...,  1.8136e-03,
+          1.8136e-03,  1.8136e-03],
+        ...,
+        [ 3.9599e-05,  4.3842e-04, -3.5922e-04,  ...,  3.9599e-05,
+          3.9599e-05,  3.9599e-05],
+        [ 6.0898e-02,  9.1116e-02,  1.2500e-01,  ...,  1.5644e-04,
+          1.5644e-04,  1.5644e-04],
+        [ 4.1862e-03,  5.8689e-03,  1.0076e-02,  ...,  5.4030e-04,
+          5.4030e-04,  5.4030e-04]], device='cuda:1')
+
+[Error] Exception at batch 14: Audio features contain NaN values
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+  Processed audio input: tensor([[-4.9771e-02, -1.8667e-02, -1.0467e-04,  ...,  3.9701e-04,
+          3.9701e-04,  3.9701e-04],
+        [ 7.2457e-03,  1.9876e-02,  1.9194e-02,  ...,  7.6945e-05,
+          7.6945e-05,  7.6945e-05],
+        [-1.6506e-01, -2.7048e-01, -1.8699e-01,  ...,  7.9292e-05,
+          7.9292e-05,  7.9292e-05],
+        ...,
+        [-1.2777e-01, -1.6004e-01, -1.7940e-01,  ..., -1.9120e-03,
+         -1.9120e-03, -1.9120e-03],
+        [ 3.3313e-02,  5.7190e-02,  5.2415e-02,  ...,  2.0181e-04,
+          2.0181e-04,  2.0181e-04],
+        [ 1.8369e-04, -1.8951e-03, -1.2021e-03,  ...,  5.3015e-04,
+          1.8369e-04,  5.3015e-04]], device='cuda:1')
+
+[Error] Exception at batch 15: Audio features contain NaN values
+Traceback (most recent call last):
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+Epoch 1 Train:   0%|                                                                                                                              | 16/74002 [00:02<1:43:14, 11.94it/s]Traceback (most recent call last):
+  Processed audio input: tensor([[ 4.9703e-04, -5.1247e-04, -1.1855e-03,  ...,  1.6053e-04,
+          1.6053e-04,  1.6053e-04],
+        [ 1.9865e-04,  4.6845e-04, -7.1149e-05,  ..., -6.0067e-03,
+          8.0228e-03, -8.9745e-03],
+        [-4.2115e-01, -1.3664e+00, -2.2460e+00,  ...,  2.7656e-04,
+          2.7656e-04,  2.7656e-04],
+        ...,
+        [-1.2141e-01, -1.1656e-01, -2.7931e-01,  ..., -2.4244e-02,
+         -2.4244e-02, -2.4244e-02],
+        [ 8.4432e-02, -3.6332e-02,  6.3192e-03,  ...,  8.9318e-05,
+          8.9318e-05,  8.9318e-05],
+        [ 3.9043e-04,  3.9043e-04,  3.9043e-04,  ...,  3.9043e-04,
+          3.9043e-04,  3.9043e-04]], device='cuda:1')
+
+[Error] Exception at batch 16: Audio features contain NaN values
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+  Processed audio input: tensor([[ 0.0218,  0.0205,  0.0172,  ...,  0.0002,  0.0002,  0.0002],
+        [-0.0009, -0.0055, -0.0040,  ...,  0.0002,  0.0002,  0.0002],
+        [ 0.0001,  0.0001,  0.0001,  ...,  0.0001,  0.0001,  0.0001],
+        ...,
+        [ 0.0007,  0.0007,  0.0007,  ...,  0.0007,  0.0007,  0.0007],
+        [-0.0057, -0.0090, -0.0087,  ...,  0.0007,  0.0007,  0.0007],
+        [ 0.0004,  0.0017,  0.0044,  ...,  0.0004,  0.0004,  0.0004]],
+       device='cuda:1')
+
+[Error] Exception at batch 17: Audio features contain NaN values
+Traceback (most recent call last):
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+Epoch 1 Train:   0%|                                                                                                                              | 18/74002 [00:02<1:39:35, 12.38it/s]Traceback (most recent call last):
+  Processed audio input: tensor([[ 0.0740,  0.0574, -0.1224,  ...,  0.0002,  0.0002,  0.0002],
+        [-0.0033, -0.0057, -0.0054,  ..., -0.0019, -0.0019, -0.0016],
+        [ 0.0006,  0.0006,  0.0008,  ...,  0.0006,  0.0006,  0.0006],
+        ...,
+        [-0.0017,  0.0003,  0.0023,  ...,  0.0003,  0.0003,  0.0003],
+        [ 0.0342,  0.0554,  0.0480,  ...,  0.0002,  0.0002,  0.0002],
+        [-0.0036, -0.0047, -0.0063,  ...,  0.0002,  0.0002,  0.0002]],
+       device='cuda:1')
+
+[Error] Exception at batch 18: Audio features contain NaN values
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+  Processed audio input: tensor([[ 6.4756e-04,  6.4756e-04,  6.4756e-04,  ...,  6.4756e-04,
+          6.4756e-04,  6.4756e-04],
+        [ 4.7318e-03,  8.0926e-03,  3.2042e-03,  ...,  1.4896e-04,
+          1.4896e-04,  1.4896e-04],
+        [ 5.3812e-02,  8.6630e-02,  7.6612e-02,  ...,  6.1334e-04,
+          6.1334e-04,  6.1334e-04],
+        ...,
+        [-1.2552e-02, -2.0107e-02, -1.6330e-02,  ...,  1.5423e-04,
+          1.5423e-04,  1.5423e-04],
+        [ 3.3261e-02,  5.1239e-02,  3.4946e-02,  ...,  1.1415e-04,
+          1.1415e-04,  1.1415e-04],
+        [ 6.0595e-04,  3.0745e-04,  8.9605e-06,  ...,  3.0745e-04,
+          3.0745e-04,  3.0745e-04]], device='cuda:1')
+
+[Error] Exception at batch 19: Audio features contain NaN values
+Traceback (most recent call last):
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+Epoch 1 Train:   0%|                                                                                                                              | 20/74002 [00:02<1:56:16, 10.60it/s]Traceback (most recent call last):
+  Processed audio input: tensor([[ 1.1550e-03, -9.7810e-03, -2.4903e-03,  ..., -6.6765e-04,
+         -6.6765e-04, -6.6765e-04],
+        [ 2.1277e-02,  5.0298e-03,  8.4867e-03,  ...,  5.3584e-04,
+          5.3584e-04,  5.3584e-04],
+        [ 6.2396e-03,  8.2549e-03, -3.8370e-03,  ...,  1.9362e-04,
+          1.9362e-04,  1.9362e-04],
+        ...,
+        [-1.3584e-03, -1.3584e-03,  4.2770e-05,  ...,  4.2770e-05,
+          4.2770e-05,  4.2770e-05],
+        [ 1.1708e-02,  1.8818e-02,  1.9706e-02,  ...,  1.5611e-04,
+          1.5611e-04,  1.5611e-04],
+        [-1.2153e-03, -1.9533e-03, -4.1675e-03,  ...,  1.0594e-02,
+          1.5022e-02,  1.9450e-02]], device='cuda:1')
+
+[Error] Exception at batch 20: Audio features contain NaN values
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+Epoch 1 Train:   0%|                                                                                                                              | 21/74002 [00:02<2:48:17,  7.33it/s]
+Traceback (most recent call last):
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 596, in <module>
+    main()
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 560, in main
+    train_loss = train_one_epoch(
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 68, in forward
+    input_values = self.processor(
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/transformers/models/wav2vec2/processing_wav2vec2.py", line 119, in __call__
+    inputs = self.feature_extractor(audio, **output_kwargs["audio_kwargs"])
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/transformers/models/wav2vec2/feature_extraction_wav2vec2.py", line 233, in __call__
+    padded_inputs["input_values"] = self.zero_mean_unit_var_norm(
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/transformers/models/wav2vec2/feature_extraction_wav2vec2.py", line 98, in zero_mean_unit_var_norm
+    normed_input_values = [(x - x.mean()) / np.sqrt(x.var() + 1e-7) for x in input_values]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/transformers/models/wav2vec2/feature_extraction_wav2vec2.py", line 98, in <listcomp>
+    normed_input_values = [(x - x.mean()) / np.sqrt(x.var() + 1e-7) for x in input_values]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/numpy/_core/_methods.py", line 171, in _var
+    arrmean = umr_sum(arr, axis, dtype, keepdims=True, where=where)
+KeyboardInterrupt

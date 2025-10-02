@@ -61,6 +61,7 @@ class AudioEncoder(nn.Module):
             device = self._device
         else:
             device = next(self.model.parameters()).device
+
         
         try:
             # 音声の前処理（自動パディング）
@@ -70,6 +71,8 @@ class AudioEncoder(nn.Module):
                 return_tensors="pt", 
                 padding=True
             ).input_values.to(device)
+
+            
         except Exception as e:
             print(f"Error in audio processing: {e}")
             print(f"  Input types: {[type(w) for w in wav]}")
@@ -86,6 +89,9 @@ class AudioEncoder(nn.Module):
         
         # NaN/Infチェック
         if torch.isnan(audio_features).any():
+            # print(f"wav: {wav}, wav shape: {[w.shape for w in wav]}")
+            # print(f"Input values: {input_values}, Input values shape: {input_values.shape}")
+            # print(f"Audio features: {audio_features}, Audio features shape: {audio_features.shape}")
             raise RuntimeError("Audio features contain NaN values")
         if torch.isinf(audio_features).any():
             raise RuntimeError("Audio features contain Inf values")

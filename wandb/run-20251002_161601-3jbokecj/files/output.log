@@ -1,0 +1,476 @@
+
+============================================================
+Training Configuration
+============================================================
+Device: cuda:1
+Batch size: 8
+Learning rate: 0.0001
+Num epochs: 10
+Use wandb: True
+============================================================
+
+[Setup] Initializing model...
+Some weights of Wav2Vec2Model were not initialized from the model checkpoint at facebook/wav2vec2-base-960h and are newly initialized: ['masked_spec_embed']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+Some weights of Wav2Vec2ForCTC were not initialized from the model checkpoint at facebook/wav2vec2-base-960h and are newly initialized: ['wav2vec2.masked_spec_embed']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+[Model] Auto-detected vocab_size: 32
+
+============================================================
+Layer Freeze Configuration
+============================================================
+✓ Audio Encoder (Wav2Vec2):    FROZEN
+✓ Vision Encoder (CLIP):       FROZEN
+✓ Cross Attention:             Trainable
+✓ Classifier (Linear):         Trainable (always)
+
+============================================================
+Parameter Statistics:
+============================================================
+Trainable parameters:  65,161,249 (26.56%)
+Frozen parameters:     180,171,136 (73.44%)
+Total parameters:      245,332,385
+============================================================
+
+[Setup] Creating dataloaders...
+
+[Dataset] Loading data with file validation...
+
+[Dataset] Loading statistics:
+  Total items in JSON:     592012
+  Missing image files:     0
+  Missing audio files:     0
+  Valid items loaded:      592012
+  Success rate:            100.00%
+
+[Dataset] Loading data with file validation...
+
+[Dataset] Loading statistics:
+  Total items in JSON:     24980
+  Missing image files:     0
+  Missing audio files:     0
+  Valid items loaded:      24980
+  Success rate:            100.00%
+
+============================================================
+Starting Training
+============================================================
+
+
+============================================================
+Epoch 1/10 - Training
+============================================================
+Epoch 1 Train:   0%|                                                                                                                                         | 0/74002 [00:00<?, ?it/s]
+[array([-3.0517578e-05,  3.0517578e-05,  0.0000000e+00, ...,
+        3.0517578e-05, -1.2207031e-04, -1.2207031e-04],
+      shape=(55979,), dtype=float32), array([ 0.00112915, -0.00299072, -0.0078125 , ..., -0.0072937 ,
+       -0.00683594, -0.00888062], shape=(83285,), dtype=float32), array([-7.4157715e-03, -1.1047363e-02, -6.0424805e-03, ...,
+        3.0517578e-05, -2.1362305e-04,  9.1552734e-05],
+      shape=(66901,), dtype=float32), array([-0.00042725, -0.00094604,  0.0007019 , ..., -0.00119019,
+        0.00106812, -0.00125122], shape=(62415,), dtype=float32), array([-0.00390625, -0.00680542, -0.00952148, ..., -0.00750732,
+       -0.00396729, -0.00393677], shape=(54613,), dtype=float32), array([3.0517578e-05, 0.0000000e+00, 0.0000000e+00, ..., 7.9345703e-04,
+       5.1879883e-04, 6.7138672e-04], shape=(91477,), dtype=float32), array([-1.5258789e-04, -3.0517578e-05,  1.8310547e-04, ...,
+       -4.5776367e-04, -3.3569336e-04, -4.2724609e-04],
+      shape=(75093,), dtype=float32), array([-0.00161743, -0.00280762,  0.00085449, ..., -0.00015259,
+       -0.00064087, -0.00048828], shape=(52013,), dtype=float32)]
+tensor([[[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        ...,
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]]], device='cuda:1',
+       grad_fn=<NativeLayerNormBackward0>)
+
+[Error] Exception at batch 0: Audio features contain NaN values
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+Epoch 1 Train:   0%|                                                                                                                              | 1/74002 [00:00<19:28:01,  1.06it/s]
+[array([ 3.0517578e-05,  0.0000000e+00,  0.0000000e+00, ...,
+       -3.0517578e-05,  3.0517578e-05,  0.0000000e+00],
+      shape=(61440,), dtype=float32), array([-2.7770996e-03,  9.4604492e-04, -6.1035156e-03, ...,
+        3.0517578e-05,  6.1035156e-05, -6.1035156e-05],
+      shape=(102400,), dtype=float32), array([-9.1552734e-05, -1.8310547e-04, -1.5258789e-04, ...,
+        2.1362305e-04,  3.0517578e-04,  3.9672852e-04],
+      shape=(53499,), dtype=float32), array([0.00018311, 0.00024414, 0.00018311, ..., 0.00180054, 0.00579834,
+       0.00665283], shape=(51883,), dtype=float32), array([ 3.0517578e-05,  0.0000000e+00,  0.0000000e+00, ...,
+       -2.3193359e-03, -2.6550293e-03, -1.5258789e-03],
+      shape=(60075,), dtype=float32), array([0.01501465, 0.01916504, 0.0111084 , ..., 0.00115967, 0.00250244,
+       0.00265503], shape=(76459,), dtype=float32), array([-0.00354004, -0.00570679, -0.00466919, ..., -0.00149536,
+       -0.00134277, -0.00158691], shape=(83285,), dtype=float32), array([-0.00015259, -0.00015259, -0.00024414, ..., -0.00033569,
+       -0.00027466,  0.00061035], shape=(46421,), dtype=float32)]
+tensor([[[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        ...,
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]]], device='cuda:1',
+       grad_fn=<NativeLayerNormBackward0>)
+
+[Error] Exception at batch 1: Audio features contain NaN values
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+[array([-3.0517578e-05,  0.0000000e+00, -3.0517578e-05, ...,
+        3.0517578e-05,  6.1035156e-05,  6.1035156e-05],
+      shape=(66901,), dtype=float32), array([-0.00360107, -0.00930786, -0.0123291 , ...,  0.00033569,
+        0.00018311,  0.00033569], shape=(61440,), dtype=float32), array([-3.0517578e-04, -1.1291504e-03, -4.2724609e-04, ...,
+        3.0517578e-05,  3.6621094e-04,  2.4414062e-04],
+      shape=(55979,), dtype=float32), array([ 0.00036621,  0.00057983,  0.00061035, ..., -0.00036621,
+       -0.00057983, -0.0005188 ], shape=(75790,), dtype=float32), array([-6.1035156e-04, -8.2397461e-04,  6.1035156e-05, ...,
+       -2.1362305e-04, -1.8310547e-04, -2.4414062e-04],
+      shape=(102400,), dtype=float32), array([-5.7983398e-04, -1.4953613e-03, -1.8005371e-03, ...,
+        1.2207031e-04,  8.2397461e-04, -6.1035156e-05],
+      shape=(47787,), dtype=float32), array([ 0.00076294,  0.00134277,  0.00024414, ...,  0.01113892,
+        0.01000977, -0.00164795], shape=(49041,), dtype=float32), array([-6.1035156e-05,  3.0517578e-04,  7.9345703e-04, ...,
+        3.0517578e-05,  0.0000000e+00,  0.0000000e+00],
+      shape=(70997,), dtype=float32)]
+tensor([[[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        ...,
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]]], device='cuda:1',
+       grad_fn=<NativeLayerNormBackward0>)
+
+[Error] Exception at batch 2: Audio features contain NaN values
+Traceback (most recent call last):
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+Epoch 1 Train:   0%|                                                                                                                               | 3/74002 [00:01<6:15:12,  3.29it/s]
+[array([0.00195312, 0.00296021, 0.00216675, ..., 0.01922607, 0.02102661,
+       0.01644897], shape=(90112,), dtype=float32), array([ 0.00021362,  0.00146484,  0.00048828, ..., -0.00054932,
+       -0.00030518,  0.00042725], shape=(63901,), dtype=float32), array([-3.9672852e-04, -7.9345703e-04, -4.5776367e-04, ...,
+        3.0517578e-05,  3.0517578e-05,  3.0517578e-05],
+      shape=(65536,), dtype=float32), array([-1.2207031e-04,  3.0517578e-05,  2.4414062e-04, ...,
+        4.2724609e-04,  4.2724609e-04,  2.1362305e-04],
+      shape=(64171,), dtype=float32), array([0., 0., 0., ..., 0., 0., 0.], shape=(77824,), dtype=float32), array([0.00466919, 0.00698853, 0.00366211, ..., 0.00482178, 0.0032959 ,
+       0.00115967], shape=(46068,), dtype=float32), array([ 5.4931641e-04,  2.9296875e-03,  1.1596680e-03, ...,
+       -5.1879883e-04, -5.1879883e-04, -6.1035156e-05],
+      shape=(64171,), dtype=float32), array([0.00143433, 0.00140381, 0.00091553, ..., 0.00186157, 0.0012207 ,
+       0.00143433], shape=(53248,), dtype=float32)]
+tensor([[[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        ...,
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]]], device='cuda:1',
+       grad_fn=<NativeLayerNormBackward0>)
+
+[Error] Exception at batch 3: Audio features contain NaN values
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+[array([0.01452637, 0.01989746, 0.01446533, ..., 0.01324463, 0.01159668,
+       0.0128479 ], shape=(54613,), dtype=float32), array([ 0.0000000e+00,  0.0000000e+00,  0.0000000e+00, ...,
+       -6.1035156e-05, -3.0517578e-05, -3.0517578e-05],
+      shape=(57344,), dtype=float32), array([-1.2207031e-04, -1.5258789e-04, -2.1362305e-04, ...,
+        3.0517578e-05,  0.0000000e+00,  0.0000000e+00],
+      shape=(69632,), dtype=float32), array([-6.1035156e-05, -1.8310547e-04, -1.5258789e-04, ...,
+        1.6479492e-03,  1.4343262e-03,  1.5869141e-03],
+      shape=(62805,), dtype=float32), array([-6.7138672e-04, -1.2207031e-03, -2.7465820e-04, ...,
+       -3.0517578e-05,  3.0517578e-05,  6.1035156e-05],
+      shape=(77824,), dtype=float32), array([-0.00036621, -0.00030518, -0.00067139, ..., -0.00167847,
+       -0.00027466, -0.00012207], shape=(66873,), dtype=float32), array([-0.0055542 , -0.00961304, -0.00460815, ..., -0.00180054,
+        0.00091553,  0.00241089], shape=(68267,), dtype=float32), array([ 3.0517578e-05,  3.0517578e-05,  0.0000000e+00, ...,
+       -9.1552734e-05, -6.1035156e-05, -6.1035156e-05],
+      shape=(96939,), dtype=float32)]
+tensor([[[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        ...,
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]],
+
+        [[nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         ...,
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan],
+         [nan, nan, nan,  ..., nan, nan, nan]]], device='cuda:1',
+       grad_fn=<NativeLayerNormBackward0>)
+
+[Error] Exception at batch 4: Audio features contain NaN values
+Traceback (most recent call last):
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 262, in train_one_epoch
+    logits = model(batch)  # [B, T, vocab_size]
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 316, in forward
+    audio_features = self.audio_encoder(data)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/kato/programs/VisionConditionedASR/src/model.py", line 94, in forward
+    raise RuntimeError("Audio features contain NaN values")
+RuntimeError: Audio features contain NaN values
+Epoch 1 Train:   0%|                                                                                                                               | 4/74002 [00:01<6:59:48,  2.94it/s]
+Traceback (most recent call last):
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 596, in <module>
+    main()
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 560, in main
+    train_loss = train_one_epoch(
+  File "/home/kato/programs/VisionConditionedASR/src/train.py", line 318, in train_one_epoch
+    continue
+KeyboardInterrupt
