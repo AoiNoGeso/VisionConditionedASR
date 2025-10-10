@@ -17,7 +17,7 @@ from dataloader import create_dataloader
 @dataclass
 class TrainingConfig:
     """学習設定"""
-    # データセット設定
+    # データセットパス
     train_json: str = "../../Datasets/SpokenCOCO/SpokenCOCO_train_fixed.json"
     val_json: str = "../../Datasets/SpokenCOCO/SpokenCOCO_val_fixed.json"
     audio_dir: str = "../../Datasets/SpokenCOCO"
@@ -26,11 +26,11 @@ class TrainingConfig:
     # モデル設定
     vocab_size: Optional[int] = None
     hidden_dim: int = 256
-    num_heads: int = 2
+    num_heads: int = 4
     
     # 学習設定
     batch_size: int = 4
-    num_epochs: int = 10
+    num_epochs: int = 20
     learning_rate: float = 1e-5
     weight_decay: float = 1e-5
     gradient_clip: float = 1.0
@@ -41,7 +41,7 @@ class TrainingConfig:
     validate_files: bool = True
     
     # 層凍結設定
-    freeze_audio_encoder: bool = True
+    freeze_audio_encoder: bool = False
     freeze_vision_encoder: bool = False
     freeze_cross_attention: bool = False
     
@@ -50,7 +50,7 @@ class TrainingConfig:
     
     # 保存設定
     checkpoint_dir: str = "../checkpoints"
-    save_epoch: int = 1
+    save_epoch: int = 2
     
     # デバイス設定
     device: str = "cuda:1"  # "cuda:0", "cuda:1", "cpu"
@@ -288,10 +288,10 @@ def train_one_epoch(
             current_loss = loss.item() # 現在の損失を取得
             total_loss += current_loss
             
-            # 💡修正: プログレスバーに損失を表示
+            # プログレスバーに損失を表示
             pbar.set_postfix(loss=f"{current_loss:.4f}")
             
-            # 💡修正: ログ出力 (tqdmがあるため詳細なログはwandbへ)
+            # ログ出力 (tqdmがあるため詳細なログはwandbへ)
             if (batch_idx + 1) % config.log_step == 0 or (batch_idx + 1) == num_batches:
                 # ログ出力は残す
                 avg_loss = total_loss / (batch_idx + 1)
@@ -367,11 +367,11 @@ def validate(
     print(f"Epoch {epoch+1}/{config.num_epochs} - Validation")
     print(f"{'='*60}")
     
-    # 💡修正: tqdmでデータローダーをラップ
+    # tqdmでデータローダーをラップ
     pbar = tqdm(dataloader, desc=f"Epoch {epoch+1} Val", total=len(dataloader))
     
     with torch.no_grad():
-        for batch_idx, batch in enumerate(pbar): # 💡修正: pbarを使用
+        for batch_idx, batch in enumerate(pbar): # pbarを使用
             try:
                 # データをデバイスに移動
                 wav_lengths = batch["wav_lengths"].to(device)
@@ -387,7 +387,7 @@ def validate(
                     total_loss += current_loss
                     num_batches += 1
                     
-                    # 💡修正: プログレスバーに損失を表示
+                    # プログレスバーに損失を表示
                     pbar.set_postfix(loss=f"{current_loss:.4f}")
                 
                 # 予測のデコード
@@ -498,7 +498,7 @@ def main():
     print(f"Batch size: {config.batch_size}")
     print(f"Learning rate: {config.learning_rate}")
     print(f"Num epochs: {config.num_epochs}")
-    print(f"Use wandb: {config.use_wandb}") # wandb設定の表示
+    print(f"Use wandb: {config.use_wandb}")
     print(f"{'='*60}\n")
     
     # トークナイザーの初期化
@@ -561,7 +561,7 @@ def main():
         )
         
         # 検証
-        val_loss = 0.0 # 💡修正: val_lossの初期化
+        val_loss = 0.0 # val_lossの初期化
         if (epoch + 1) % config.validate_epoch == 0:
             val_loss = validate(
                 model, val_loader, tokenizer, device, epoch, config
@@ -577,7 +577,6 @@ def main():
         
         # 定期的なチェックポイント保存
         if (epoch + 1) % config.save_epoch == 0:
-            # 💡修正: val_lossが未定義の場合の処理を修正
             save_checkpoint(
                 model, optimizer, epoch, train_loss, val_loss, config
             )
