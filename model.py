@@ -1,8 +1,10 @@
-from transformers import AutoTokenizer, AutoProcessor, AutoModelForCTC, CLIPProcessor, CLIPModel, Wav2Vec2Model
+from transformers import AutoTokenizer, AutoProcessor, AutoModelForCTC, CLIPProcessor, CLIPModel
 import torch
 import torch.nn as nn
 from PIL import Image
 import torchaudio
+import numpy as np
+import os
 
 class AudioEncoder(nn.Module):
     """
@@ -14,11 +16,6 @@ class AudioEncoder(nn.Module):
     
     出力:
         audio_features: Tensor[B, seq_len, 768] - 音声特徴量
-    
-    Note:
-        - 入力音声は16kHzを想定
-        - 異なる長さの音声は自動的にパディングされる
-        - 事前学習済みWav2Vec2モデルを使用（CTCヘッドなし）
     """
     
     def __init__(self, model_name="facebook/wav2vec2-base-960h", device=None):
@@ -27,19 +24,31 @@ class AudioEncoder(nn.Module):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, force_download=True)
         self.processor = AutoProcessor.from_pretrained(model_name, force_download=True)
         
-        # Wav2Vec2Modelを使用（CTCヘッドなし、メモリ効率化）
-        self.model = Wav2Vec2Model.from_pretrained(model_name, force_download=True)
+        # AutoModelForCTCを使用
+        self.model = AutoModelForCTC.from_pretrained(model_name, force_download=True)
 
-        if hasattr(self.model, 'masked_spec_embed') and self.model.masked_spec_embed is not None:
-            if torch.isnan(self.model.masked_spec_embed).any():
-                print(f"🚨Detected NaN in 'masked_spec_embed'. Re-initializing with normal distribution.")
-                # 重みを標準正規分布で再初期化 (Wav2Vec2のデフォルト初期化に倣う)
-                nn.init.normal_(self.model.masked_spec_embed.data, mean=0.0, std=1.0)
+        # 💡修正: masked_spec_embedを無条件で再初期化
+        if hasattr(self.model, 'wav2vec2') and hasattr(self.model.wav2vec2, 'masked_spec_embed'):
+            if self.model.wav2vec2.masked_spec_embed is not None:
+                print("[AudioEncoder] Re-initializing masked_spec_embed to avoid NaN...")
+                
+                # 小さい範囲の一様分布で初期化
+                nn.init.uniform_(
+                    self.model.wav2vec2.masked_spec_embed.data,
+                    a=-0.01,
+                    b=0.01
+                )
+                
+                # 再初期化後の確認
+                if torch.isnan(self.model.wav2vec2.masked_spec_embed).any():
+                    raise RuntimeError("🚨 CRITICAL: Failed to initialize masked_spec_embed!")
+                
+                print(f"[AudioEncoder] ✓ masked_spec_embed initialized successfully")
+                print(f"  Range: [{self.model.wav2vec2.masked_spec_embed.min().item():.6f}, "
+                      f"{self.model.wav2vec2.masked_spec_embed.max().item():.6f}]")
         
-        # 語彙サイズを取得（CTCモデルから一時的に取得）
-        temp_ctc_model = AutoModelForCTC.from_pretrained(model_name, force_download=True)
-        self.vocab_size = temp_ctc_model.config.vocab_size
-        del temp_ctc_model
+        self.vocab_size = self.model.config.vocab_size
+        print(f"[AudioEncoder] Vocab size: {self.vocab_size}")
         
         # デバイスの保存
         self._device = device
@@ -70,14 +79,23 @@ class AudioEncoder(nn.Module):
 
         
         try:
-            # 音声の前処理（自動パディング）
-            input_values = self.processor(
+            # 💡修正: 音声の前処理（attention_maskを取得）
+            processed = self.processor(
                 wav,
                 sampling_rate=16000, 
                 return_tensors="pt", 
                 padding=True
-            ).input_values.to(device)
-
+            )
+            
+            input_values = processed.input_values.to(device)
+            attention_mask = processed.attention_mask.to(device) if hasattr(processed, 'attention_mask') else None
+            
+            # 💡追加: 入力値の健全性チェック
+            if torch.isnan(input_values).any() or torch.isinf(input_values).any():
+                raise RuntimeError("Input values contain NaN or Inf after processing")
+            
+            # 💡追加: 入力値の範囲チェック（異常な値をクリッピング）
+            input_values = torch.clamp(input_values, min=-10.0, max=10.0)
             
         except Exception as e:
             print(f"Error in audio processing: {e}")
@@ -85,9 +103,10 @@ class AudioEncoder(nn.Module):
             print(f"  Input shapes: {[w.shape if hasattr(w, 'shape') else len(w) for w in wav]}")
             raise
         
-        # 特徴抽出
-        audio_outputs = self.model(
+        # 💡修正: attention_maskを渡して特徴抽出
+        audio_outputs = self.model.wav2vec2(
             input_values,
+            attention_mask=attention_mask,  # パディング位置を明示
             output_hidden_states=False,
             return_dict=True
         )
@@ -95,9 +114,10 @@ class AudioEncoder(nn.Module):
         
         # NaN/Infチェック
         if torch.isnan(audio_features).any():
-            # print(f"wav: {wav}, wav shape: {[w.shape for w in wav]}")
-            # print(f"Input values: {input_values}, Input values shape: {input_values.shape}")
-            # print(f"Audio features: {audio_features}, Audio features shape: {audio_features.shape}")
+            print(f"\n🚨 CRITICAL: NaN detected in audio features!")
+            print(f"  Input values range: [{input_values.min():.4f}, {input_values.max():.4f}]")
+            print(f"  Input values shape: {input_values.shape}")
+            print(f"  Attention mask: {attention_mask}")
             raise RuntimeError("Audio features contain NaN values")
         if torch.isinf(audio_features).any():
             raise RuntimeError("Audio features contain Inf values")
@@ -162,7 +182,7 @@ class VisionEncoder(nn.Module):
             
             # デバイスに移動
             inputs = {k: v.to(device) if isinstance(v, torch.Tensor) else v 
-                     for k, v in inputs.items()}
+                      for k, v in inputs.items()}
         except Exception as e:
             print(f"Error in image processing: {e}")
             print(f"  Input types: {[type(img) for img in images]}")
@@ -242,8 +262,8 @@ class CrossAttention(nn.Module):
         vision_v = self.vision_value(vision_features) # [B, 1, hidden_dim]
         
         # クロスアテンションのためのkey/valueの結合
-        keys = torch.cat([audio_k, vision_k], dim=1)     # [B, seq_len+1, hidden_dim]
-        values = torch.cat([audio_v, vision_v], dim=1)   # [B, seq_len+1, hidden_dim]
+        keys = torch.cat([audio_k, vision_k], dim=1)      # [B, seq_len+1, hidden_dim]
+        values = torch.cat([audio_v, vision_v], dim=1)    # [B, seq_len+1, hidden_dim]
         
         # マルチヘッドアテンション（attention weightsは保存しない）
         attn_output, _ = self.multihead_attn(
@@ -370,7 +390,7 @@ def demo():
     # データセット作成（バッチ形式）
     sample = {
         "wav": [wav.numpy()],  # List形式
-        "image": [image],       # List形式
+        "image": [image],        # List形式
         "text": "A URINAL IN A PUBLIC RESTROOM NEAR A WOODEN TABLE"
     }
     
@@ -434,5 +454,166 @@ def demo():
     print(f"{'='*60}\n")
 
 
+def demo_batch():
+    """バッチ処理によるデモ実行関数（複数の音声と画像を同時に処理）"""
+    print("="*60)
+    print("Vision-Conditioned ASR Batch Demo")
+    print("="*60)
+    
+    # モデルの初期化
+    print("\n[1/5] Initializing model...")
+    avsr = VisionConditionedASR()
+    avsr.eval()  # 評価モードに設定
+    
+    sample_files = [
+        {
+            "wav": "../../Datasets/SpokenCOCO/wavs/val/0/m071506418gb9vo0w5xq3-3LUY3GC63Z0R9PYEETJGN5HO4UEP7B_325114_629297.wav",
+            "img": "../../Datasets/stair_captions/images/val2014/COCO_val2014_000000325114.jpg",
+            "text": "A URINAL IN A PUBLIC RESTROOM NEAR A WOODEN TABLE"
+        },
+        # 💡改善: 実際には異なるファイルを使用することを推奨
+        # 以下は2つ目のサンプル例（実際のパスに置き換える）
+        {
+            "wav": "../../Datasets/SpokenCOCO/wavs/val/0/m1a5mox83rrx60-3V5Q80FXIXRDGZWLAJ5EEBXFON723D_297698_737627.wav",
+            "img": "../../Datasets/stair_captions/images/val2014/COCO_val2014_000000297698.jpg",
+            "text": "THE SKIER TAKES OFF DOWN THE STEEP HILL"
+        }
+    ]
+    
+    # 💡追加: ファイル存在チェックと音声/画像のロード
+    wavs = []
+    images = []
+    texts = []
+    
+    print("\n[2/5] Loading samples...")
+    for i, sample_file in enumerate(sample_files):
+        try:
+            # 💡追加: ファイル存在チェック
+            if not os.path.exists(sample_file["wav"]):
+                print(f"  ⚠️  Sample {i+1}: Audio file not found, skipping...")
+                continue
+            if not os.path.exists(sample_file["img"]):
+                print(f"  ⚠️  Sample {i+1}: Image file not found, skipping...")
+                continue
+            
+            # 音声読み込み
+            wav, sr = torchaudio.load(sample_file["wav"])
+            if sr != 16000:
+                wav = torchaudio.transforms.Resample(sr, 16000)(wav)
+            if wav.shape[0] > 1:
+                wav = wav.mean(dim=0, keepdim=True)
+            wav = wav.squeeze(0).numpy()
+            
+            # 画像読み込み
+            image = Image.open(sample_file["img"]).convert('RGB')
+            
+            wavs.append(wav)
+            images.append(image)
+            texts.append(sample_file["text"])
+            
+            # 💡追加: 各サンプルの情報を表示
+            print(f"  ✓ Sample {i+1}: Audio shape={wav.shape}, Image size={image.size}")
+            
+        except Exception as e:
+            print(f"  ✗ Sample {i+1}: Error loading - {e}")
+            continue
+    
+    # 💡追加: ロードされたサンプルが0の場合はエラー
+    if len(wavs) == 0:
+        print("\n❌ No valid samples loaded. Please check file paths.")
+        return
+    
+    # 💡追加: 音声長の統計情報を表示
+    wav_lengths = [len(w) for w in wavs]
+    print(f"\n[3/5] Audio length statistics:")
+    print(f"  Min length: {min(wav_lengths):,} samples ({min(wav_lengths)/16000:.2f}s)")
+    print(f"  Max length: {max(wav_lengths):,} samples ({max(wav_lengths)/16000:.2f}s)")
+    print(f"  Mean length: {np.mean(wav_lengths):,.0f} samples ({np.mean(wav_lengths)/16000:.2f}s)")
+    print(f"  → Padding will be applied to max length")
+    
+    # バッチデータセット作成
+    batch_sample = {
+        "wav": wavs,
+        "image": images,
+        "text": texts
+    }
+    
+    # 推論実行
+    print(f"\n[4/5] Running batch inference (Batch Size: {len(batch_sample['wav'])})...")
+    try:
+        with torch.no_grad():
+            # 各コンポーネントの出力確認
+            audio_outputs = avsr.audio_encoder(data=batch_sample)
+            vision_outputs = avsr.vision_encoder(data=batch_sample)
+            asr_outputs = avsr(data=batch_sample)
+        
+        # --- 出力形状の確認 ---
+        print(f"\n{'='*60}")
+        print("Batch Output Shapes:")
+        print(f"{'='*60}")
+        print(f"  Audio features:  {audio_outputs.shape}  # [B, seq_len, 768]")
+        print(f"  Vision features: {vision_outputs.shape}  # [B, 512]")
+        print(f"  ASR logits:      {asr_outputs.shape}    # [B, seq_len, vocab_size]")
+        print(f"  Batch size (B):  {asr_outputs.shape[0]}")
+        
+        # 💡追加: NaN/Infチェック
+        if torch.isnan(asr_outputs).any():
+            print("\n⚠️  WARNING: NaN detected in ASR outputs!")
+        if torch.isinf(asr_outputs).any():
+            print("\n⚠️  WARNING: Inf detected in ASR outputs!")
+        
+    except Exception as e:
+        print(f"\n❌ Inference failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return
+    
+    # --- デコーディング処理 ---
+    print(f"\n[5/5] Decoding Batch Results...")
+    print(f"{'='*60}")
+    
+    tokenizer = avsr.audio_encoder.tokenizer
+    
+    # logitsから予測されたトークンIDを取得
+    predicted_ids = torch.argmax(asr_outputs, dim=-1)  # [B, seq_len]
+    
+    # CTC blank tokenのID（通常は0）
+    blank_token_id = 0
+    
+    for i, pred_ids in enumerate(predicted_ids):
+        pred_ids = pred_ids.cpu().numpy()
+        
+        # CTCデコーディング
+        pred_tokens = []
+        prev_token = None
+        
+        for token_id in pred_ids:
+            # blank tokenをスキップ
+            if token_id == blank_token_id:
+                prev_token = None
+                continue
+            
+            # 連続する同じトークンは1つだけ保持
+            if token_id != prev_token:
+                pred_tokens.append(token_id)
+            
+            prev_token = token_id
+        
+        # デコード
+        transcription = tokenizer.decode(pred_tokens, skip_special_tokens=True)
+        
+        print(f"\nSample {i+1} / {len(predicted_ids)}:")
+        print(f"  Audio length: {wav_lengths[i]:,} samples ({wav_lengths[i]/16000:.2f}s)")
+        print(f"  Ground Truth: {batch_sample['text'][i]}")
+        print(f"  Prediction:   {transcription}")
+        print(f"  Note: Model is untrained, output is random")
+    
+    print(f"\n{'='*60}")
+    print("Batch Demo completed successfully!")
+    print(f"{'='*60}\n")
+
+
 if __name__ == "__main__":
-    demo()
+    # demo()         # 単一データ版
+    demo_batch()    # バッチ処理版
+

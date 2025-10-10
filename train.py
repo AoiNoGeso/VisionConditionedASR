@@ -7,7 +7,7 @@ from datetime import datetime
 from dataclasses import dataclass
 from typing import Optional, List
 import numpy as np
-from tqdm import tqdm 
+from tqdm import tqdm
 import wandb
 
 from model import VisionConditionedASR
@@ -24,12 +24,12 @@ class TrainingConfig:
     image_dir: str = "../../Datasets/stair_captions/images"
     
     # モデル設定
-    vocab_size: Optional[int] = None  # Noneで自動取得
+    vocab_size: Optional[int] = None
     hidden_dim: int = 256
     num_heads: int = 2
     
     # 学習設定
-    batch_size: int = 8
+    batch_size: int = 4
     num_epochs: int = 10
     learning_rate: float = 1e-5
     weight_decay: float = 1e-5
@@ -37,12 +37,12 @@ class TrainingConfig:
     
     # データローダー設定
     num_workers: int = 4
-    max_audio_length: float = 10.0  # 秒
+    max_audio_length: float = 10.0
     validate_files: bool = True
     
     # 層凍結設定
     freeze_audio_encoder: bool = True
-    freeze_vision_encoder: bool = True
+    freeze_vision_encoder: bool = False
     freeze_cross_attention: bool = False
     
     # 学習スケジュール
@@ -50,7 +50,7 @@ class TrainingConfig:
     
     # 保存設定
     checkpoint_dir: str = "../checkpoints"
-    save_epoch: int = 1  # エポックごと
+    save_epoch: int = 1
     
     # デバイス設定
     device: str = "cuda:1"  # "cuda:0", "cuda:1", "cpu"
@@ -58,9 +58,8 @@ class TrainingConfig:
     # ログ設定
     log_step: int = 50  # ステップごと
     validate_epoch: int = 1  # エポックごと
-    use_wandb: bool = True # 💡追加: wandbの使用/不使用
-    # wandb設定
-    wandb_project: str = "VisionConditionedASR" # 💡追加: wandbプロジェクト名
+    use_wandb: bool = False  # wandbの使用/不使用
+    wandb_project: str = "VisionConditionedASR"
 
 
 def freeze_layers(model: VisionConditionedASR, config: TrainingConfig):
@@ -286,7 +285,7 @@ def train_one_epoch(
             optimizer.step()
             
             # 損失の累積
-            current_loss = loss.item() # 💡追加: 現在の損失を取得
+            current_loss = loss.item() # 現在の損失を取得
             total_loss += current_loss
             
             # 💡修正: プログレスバーに損失を表示
@@ -299,7 +298,7 @@ def train_one_epoch(
                 # print(f"  [{epoch+1}][{batch_idx+1}/{num_batches}] "
                 #       f"Loss: {current_loss:.4f} | Avg Loss: {avg_loss:.4f}")
 
-                # 💡追加: wandbにステップごとの損失をログ
+                # wandbにステップごとの損失をログ
                 if config.use_wandb:
                     wandb.log({
                         "train/loss_step": current_loss,
@@ -319,7 +318,7 @@ def train_one_epoch(
     
     avg_loss = total_loss / num_batches if num_batches > 0 else 0.0
     
-    # 💡追加: wandbにエポックごとの平均損失をログ
+    # wandbにエポックごとの平均損失をログ
     if config.use_wandb:
         wandb.log({
             "train/loss_epoch": avg_loss,
@@ -384,7 +383,7 @@ def validate(
                 loss = compute_ctc_loss(logits, batch["text"], tokenizer, wav_lengths)
                 
                 if not (torch.isnan(loss) or torch.isinf(loss)):
-                    current_loss = loss.item() # 💡追加: 現在の損失を取得
+                    current_loss = loss.item() # 現在の損失を取得
                     total_loss += current_loss
                     num_batches += 1
                     
@@ -410,16 +409,16 @@ def validate(
     print("Prediction Examples:")
     print(f"{'='*60}")
     
-    prediction_table = [] # 💡追加: wandb用テーブル
+    prediction_table = [] # wandb用テーブル
     for i in range(min(num_examples, len(all_predictions))):
         ref = all_references[i][:80]
         pred = all_predictions[i][:80]
         print(f"\nExample {i+1}:")
         print(f"  Reference:  {ref}")
         print(f"  Prediction: {pred}")
-        prediction_table.append([i+1, ref, pred]) # 💡追加: wandb用データ追加
+        prediction_table.append([i+1, ref, pred]) # wandb用データ追加
         
-    # 💡追加: wandbに検証結果をログ
+    # wandbに検証結果をログ
     if config.use_wandb:
         wandb.log({
             "val/loss_epoch": avg_loss,
@@ -482,7 +481,7 @@ def main():
     # 設定の初期化
     config = TrainingConfig()
     
-    # 💡追加: wandbの初期化
+    # wandbの初期化
     if config.use_wandb:
         print("[Setup] Initializing wandb...")
         wandb.init(
@@ -499,7 +498,7 @@ def main():
     print(f"Batch size: {config.batch_size}")
     print(f"Learning rate: {config.learning_rate}")
     print(f"Num epochs: {config.num_epochs}")
-    print(f"Use wandb: {config.use_wandb}") # 💡追加: wandb設定の表示
+    print(f"Use wandb: {config.use_wandb}") # wandb設定の表示
     print(f"{'='*60}\n")
     
     # トークナイザーの初期化
@@ -525,7 +524,7 @@ def main():
         image_dir=config.image_dir,
         batch_size=config.batch_size,
         shuffle=True,
-        num_workers=config.num_workers,
+        # num_workers=config.num_workers,
         max_audio_length=config.max_audio_length,
         validate_files=config.validate_files
     )
@@ -536,7 +535,7 @@ def main():
         image_dir=config.image_dir,
         batch_size=config.batch_size,
         shuffle=False,
-        num_workers=config.num_workers,
+        # num_workers=config.num_workers,
         max_audio_length=config.max_audio_length,
         validate_files=config.validate_files
     )
@@ -587,7 +586,7 @@ def main():
     print("Training Completed!")
     print("="*60 + "\n")
     
-    # 💡追加: wandbの終了
+    # wandbの終了
     if config.use_wandb:
         wandb.finish()
 
