@@ -29,7 +29,7 @@ class TestConfig:
     # モデル設定（チェックポイントから自動取得されるが、念のため）
     vocab_size: Optional[int] = None
     hidden_dim: int = 256
-    num_heads: int = 4
+    num_heads: int = 2
     
     # データローダー設定
     batch_size: int = 16
@@ -127,22 +127,34 @@ def compute_wer(references: List[str], hypotheses: List[str]) -> Dict[str, float
     Returns:
         WER統計情報の辞書
     """
-    # jiwerを使用してWERを計算
-    wer = jiwer.wer(references, hypotheses)
-    mer = jiwer.mer(references, hypotheses)
-    wil = jiwer.wil(references, hypotheses)
+    # 💡修正: jiwerの新しいAPIを使用
+    output = jiwer.process_words(references, hypotheses)
     
-    # 詳細な統計情報を取得
-    measures = jiwer.process_words(references, hypotheses)
+    # アライメントから統計を集計
+    total_substitutions = 0
+    total_deletions = 0
+    total_insertions = 0
+    total_hits = 0
+    
+    for alignment in output.alignments:
+        for op in alignment:
+            if op.type == 'substitute':
+                total_substitutions += 1
+            elif op.type == 'delete':
+                total_deletions += 1
+            elif op.type == 'insert':
+                total_insertions += 1
+            elif op.type == 'equal':
+                total_hits += 1
     
     return {
-        'wer': wer * 100,  # パーセンテージに変換
-        'mer': mer * 100,
-        'wil': wil * 100,
-        'substitutions': measures['substitutions'],
-        'deletions': measures['deletions'],
-        'insertions': measures['insertions'],
-        'hits': measures['hits']
+        'wer': output.wer * 100,  # パーセンテージに変換
+        'mer': output.mer * 100,
+        'wil': output.wil * 100,
+        'substitutions': total_substitutions,
+        'deletions': total_deletions,
+        'insertions': total_insertions,
+        'hits': total_hits
     }
 
 
@@ -162,6 +174,7 @@ def load_checkpoint(checkpoint_path: str, model: VisionConditionedASR, device: t
         raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
     
     print(f"\n[Loading] Loading checkpoint from: {checkpoint_path}")
+    # 💡修正: weights_only=Falseを指定（信頼できるチェックポイントの場合）
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     
     # モデルの重みをロード

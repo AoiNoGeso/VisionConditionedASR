@@ -30,7 +30,7 @@ class TrainingConfig:
     
     # 学習設定
     batch_size: int = 4
-    num_epochs: int = 20
+    num_epochs: int = 5
     learning_rate: float = 1e-5
     weight_decay: float = 1e-5
     gradient_clip: float = 1.0
@@ -42,14 +42,14 @@ class TrainingConfig:
     
     # 層凍結設定
     freeze_audio_encoder: bool = False
-    freeze_vision_encoder: bool = False
+    freeze_vision_encoder: bool = True
     freeze_cross_attention: bool = False
     
     # 学習スケジュール
     warmup_steps: int = 1000
     
     # 保存設定
-    checkpoint_dir: str = "../checkpoints"
+    checkpoint_dir: str = "../checkpoints/fp32_models/"
     save_epoch: int = 2
     
     # デバイス設定
@@ -58,7 +58,7 @@ class TrainingConfig:
     # ログ設定
     log_step: int = 50  # ステップごと
     validate_epoch: int = 1  # エポックごと
-    use_wandb: bool = True  # wandbの使用/不使用
+    use_wandb: bool = False  # wandbの使用/不使用
     wandb_project: str = "VisionConditionedASR"
 
 

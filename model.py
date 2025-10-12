@@ -26,6 +26,10 @@ class AudioEncoder(nn.Module):
         
         # AutoModelForCTCを使用
         self.model = AutoModelForCTC.from_pretrained(model_name, force_download=True)
+        
+        # CNN部分を凍結
+        self.model.freeze_feature_encoder()
+
 
         # masked_spec_embedを無条件で再初期化
         if hasattr(self.model, 'wav2vec2') and hasattr(self.model.wav2vec2, 'masked_spec_embed'):
