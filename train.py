@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from torch.amp import autocast, GradScaler
 from transformers import AutoTokenizer
 import os
 from datetime import datetime
@@ -31,7 +32,7 @@ class TrainingConfig:
     
     # 学習設定
     batch_size: int = 8
-    num_epochs: int = 1
+    num_epochs: int = 5
     learning_rate: float = 1e-5
     weight_decay: float = 1e-5
     gradient_clip: float = 1.0
@@ -48,6 +49,10 @@ class TrainingConfig:
     
     # 学習スケジュール
     warmup_steps: int = 1000
+    
+    # 半精度学習設定
+    use_amp: bool = True  # Automatic Mixed Precision (AMP) の使用
+    amp_dtype: str = "float16"  # "float16" or "bfloat16"
     
     # 保存設定
     checkpoint_dir: str = "../checkpoints"
@@ -223,6 +228,7 @@ def train_one_epoch(
     model: VisionConditionedASR,
     dataloader: DataLoader,
     optimizer: torch.optim.Optimizer,
+    scaler: GradScaler,
     tokenizer,
     device: torch.device,
     epoch: int,
@@ -235,6 +241,7 @@ def train_one_epoch(
         model: モデル
         dataloader: データローダー
         optimizer: オプティマイザー
+        scaler: GradScaler (AMP用)
         tokenizer: トークナイザー
         device: デバイス
         epoch: 現在のエポック番号
@@ -247,6 +254,9 @@ def train_one_epoch(
     total_loss = 0.0
     num_batches = len(dataloader)
     
+    # amp_dtypeの設定
+    amp_dtype = torch.float16 if config.amp_dtype == "float16" else torch.bfloat16
+    
     print(f"\n{'='*60}")
     print(f"Epoch {epoch+1}/{config.num_epochs} - Training")
     print(f"{'='*60}")
@@ -258,17 +268,18 @@ def train_one_epoch(
             # データをデバイスに移動（wav_lengthsのみ）
             wav_lengths = batch["wav_lengths"].to(device)
             
-            # Forward pass
-            logits = model(batch)  # [B, T, vocab_size]
-            
-            # NaN/Infチェック
-            if torch.isnan(logits).any() or torch.isinf(logits).any():
-                print(f"\n🚨 CRITICAL: Logits contain NaN or Inf at batch {batch_idx}!")
-                print(f"  Skipping this batch...")
-                continue
-            
-            # CTC損失の計算
-            loss = compute_ctc_loss(logits, batch["text"], tokenizer, wav_lengths)
+            # Forward pass with autocast
+            with autocast(device_type='cuda', enabled=config.use_amp, dtype=amp_dtype):
+                logits = model(batch)  # [B, T, vocab_size]
+                
+                # NaN/Infチェック
+                if torch.isnan(logits).any() or torch.isinf(logits).any():
+                    print(f"\n🚨 CRITICAL: Logits contain NaN or Inf at batch {batch_idx}!")
+                    print(f"  Skipping this batch...")
+                    continue
+                
+                # CTC損失の計算
+                loss = compute_ctc_loss(logits, batch["text"], tokenizer, wav_lengths)
             
             # NaN/Infチェック
             if torch.isnan(loss) or torch.isinf(loss):
@@ -276,14 +287,17 @@ def train_one_epoch(
                 print(f"  Skipping this batch...")
                 continue
             
-            # Backward pass
+            # Backward pass with scaler
             optimizer.zero_grad()
-            loss.backward()
+            scaler.scale(loss).backward()
             
-            # Gradient clipping
+            # Gradient clipping (scaler.unscale_後)
+            scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(model.parameters(), config.gradient_clip)
             
-            optimizer.step()
+            # Optimizer step
+            scaler.step(optimizer)
+            scaler.update()
             
             # 損失の累積
             current_loss = loss.item() # 現在の損失を取得
@@ -304,9 +318,10 @@ def train_one_epoch(
                     wandb.log({
                         "train/loss_step": current_loss,
                         "train/avg_loss_step": avg_loss,
+                        "train/scale": scaler.get_scale(),  # GradScalerのスケール値
                         "epoch": epoch,
                     }, step=epoch * num_batches + batch_idx + 1)
-
+            
             # メモリクリア
             if batch_idx % 50 == 0 and device.type == 'cuda':
                 torch.cuda.empty_cache()
@@ -364,6 +379,9 @@ def validate(
     all_predictions = []
     all_references = []
     
+    # amp_dtypeの設定
+    amp_dtype = torch.float16 if config.amp_dtype == "float16" else torch.bfloat16
+    
     print(f"\n{'='*60}")
     print(f"Epoch {epoch+1}/{config.num_epochs} - Validation")
     print(f"{'='*60}")
@@ -377,11 +395,12 @@ def validate(
                 # データをデバイスに移動
                 wav_lengths = batch["wav_lengths"].to(device)
                 
-                # Forward pass
-                logits = model(batch)
-                
-                # 損失計算
-                loss = compute_ctc_loss(logits, batch["text"], tokenizer, wav_lengths)
+                # Forward pass with autocast
+                with autocast(device_type='cuda', enabled=config.use_amp, dtype=amp_dtype):
+                    logits = model(batch)
+                    
+                    # 損失計算
+                    loss = compute_ctc_loss(logits, batch["text"], tokenizer, wav_lengths)
                 
                 if not (torch.isnan(loss) or torch.isinf(loss)):
                     current_loss = loss.item() # 現在の損失を取得
@@ -442,6 +461,7 @@ def validate(
 def save_checkpoint(
     model: VisionConditionedASR,
     optimizer: torch.optim.Optimizer,
+    scaler: GradScaler,
     epoch: int,
     train_loss: float,
     val_loss: float,
@@ -453,6 +473,7 @@ def save_checkpoint(
     Args:
         model: モデル
         optimizer: オプティマイザー
+        scaler: GradScaler (AMP用)
         epoch: エポック番号
         train_loss: 訓練損失
         val_loss: 検証損失
@@ -471,6 +492,7 @@ def save_checkpoint(
     torch.save({
         'epoch': epoch,
         'optimizer_state_dict': optimizer.state_dict(),
+        'scaler_state_dict': scaler.state_dict(),  # GradScalerの状態を追加
         'train_loss': train_loss,
         'val_loss': val_loss,
         'config': config
@@ -502,6 +524,9 @@ def main():
     print(f"Batch size: {config.batch_size}")
     print(f"Learning rate: {config.learning_rate}")
     print(f"Num epochs: {config.num_epochs}")
+    print(f"Use AMP: {config.use_amp}")
+    if config.use_amp:
+        print(f"AMP dtype: {config.amp_dtype}")
     print(f"Use wandb: {config.use_wandb}")
     print(f"{'='*60}\n")
     
@@ -519,6 +544,9 @@ def main():
     
     # 層の凍結
     freeze_layers(model, config)
+    
+    # GradScalerの初期化
+    scaler = GradScaler(enabled=config.use_amp)
     
     # データローダーの作成
     print("[Setup] Creating dataloaders...")
@@ -561,7 +589,7 @@ def main():
     for epoch in range(config.num_epochs):
         # 訓練
         train_loss = train_one_epoch(
-            model, train_loader, optimizer, tokenizer, device, epoch, config
+            model, train_loader, optimizer, scaler, tokenizer, device, epoch, config
         )
         
         # 検証
@@ -576,13 +604,13 @@ def main():
                 best_val_loss = val_loss
                 print(f"\n✨ New best validation loss: {best_val_loss:.4f}")
                 save_checkpoint(
-                    model, optimizer, epoch, train_loss, val_loss, config
+                    model, optimizer, scaler, epoch, train_loss, val_loss, config
                 )
         
-        
+        # 定期的なチェックポイント保存
         if (epoch + 1) % config.save_epoch == 0:
             save_checkpoint(
-                model, optimizer, epoch, train_loss, val_loss, config
+                model, optimizer, scaler, epoch, train_loss, val_loss, config
             )
     
     print("\n" + "="*60)
