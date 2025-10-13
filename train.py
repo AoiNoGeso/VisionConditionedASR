@@ -9,6 +9,7 @@ from typing import Optional, List
 import numpy as np
 from tqdm import tqdm
 import wandb
+from safetensors.torch import save_file
 
 from model import VisionConditionedASR
 from dataloader import create_dataloader
@@ -29,8 +30,8 @@ class TrainingConfig:
     num_heads: int = 4
     
     # 学習設定
-    batch_size: int = 4
-    num_epochs: int = 5
+    batch_size: int = 8
+    num_epochs: int = 1
     learning_rate: float = 1e-5
     weight_decay: float = 1e-5
     gradient_clip: float = 1.0
@@ -49,8 +50,8 @@ class TrainingConfig:
     warmup_steps: int = 1000
     
     # 保存設定
-    checkpoint_dir: str = "../checkpoints/fp32_models/"
-    save_epoch: int = 2
+    checkpoint_dir: str = "../checkpoints"
+    save_epoch: int = 1
     
     # デバイス設定
     device: str = "cuda:1"  # "cuda:0", "cuda:1", "cpu"
@@ -305,7 +306,7 @@ def train_one_epoch(
                         "train/avg_loss_step": avg_loss,
                         "epoch": epoch,
                     }, step=epoch * num_batches + batch_idx + 1)
-            
+                    
             # メモリクリア
             if batch_idx % 50 == 0 and device.type == 'cuda':
                 torch.cuda.empty_cache()
@@ -457,23 +458,26 @@ def save_checkpoint(
         val_loss: 検証損失
         config: 学習設定
     """
-    os.makedirs(config.checkpoint_dir, exist_ok=True)
+    # エポックごとのディレクトリを作成
+    epoch_dir = os.path.join(config.checkpoint_dir, f"epoch_{epoch+1}")
+    os.makedirs(epoch_dir, exist_ok=True)
     
-    checkpoint_path = os.path.join(
-        config.checkpoint_dir,
-        f"checkpoint_epoch_{epoch+1}.pt"
-    )
+    # モデルの重みを.safetensors形式で保存
+    model_path = os.path.join(epoch_dir, f"model_epoch_{epoch+1}.safetensors")
+    save_file(model.state_dict(), model_path)
     
+    # その他の学習状態を.pt形式で保存
+    state_path = os.path.join(epoch_dir, f"checkpoint_epoch_{epoch+1}_state.pt")
     torch.save({
         'epoch': epoch,
-        'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
         'train_loss': train_loss,
         'val_loss': val_loss,
         'config': config
-    }, checkpoint_path)
+    }, state_path)
     
-    print(f"[Checkpoint] Saved to {checkpoint_path}")
+    print(f"[Checkpoint] Model saved to: {model_path}")
+    print(f"[Checkpoint] State saved to: {state_path}")
 
 
 def main():
@@ -575,7 +579,7 @@ def main():
                     model, optimizer, epoch, train_loss, val_loss, config
                 )
         
-        # 定期的なチェックポイント保存
+        
         if (epoch + 1) % config.save_epoch == 0:
             save_checkpoint(
                 model, optimizer, epoch, train_loss, val_loss, config
