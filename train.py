@@ -306,7 +306,7 @@ def train_one_epoch(
                         "train/avg_loss_step": avg_loss,
                         "epoch": epoch,
                     }, step=epoch * num_batches + batch_idx + 1)
-                    
+
             # メモリクリア
             if batch_idx % 50 == 0 and device.type == 'cuda':
                 torch.cuda.empty_cache()
@@ -528,7 +528,7 @@ def main():
         image_dir=config.image_dir,
         batch_size=config.batch_size,
         shuffle=True,
-        # num_workers=config.num_workers,
+        num_workers=config.num_workers,
         max_audio_length=config.max_audio_length,
         validate_files=config.validate_files
     )
@@ -539,7 +539,7 @@ def main():
         image_dir=config.image_dir,
         batch_size=config.batch_size,
         shuffle=False,
-        # num_workers=config.num_workers,
+        num_workers=config.num_workers,
         max_audio_length=config.max_audio_length,
         validate_files=config.validate_files
     )
