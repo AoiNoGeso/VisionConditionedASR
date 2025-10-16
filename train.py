@@ -31,7 +31,7 @@ class TrainingConfig:
     num_heads: int = 4
     
     # 学習設定
-    batch_size: int = 8
+    batch_size: int = 16
     num_epochs: int = 5
     learning_rate: float = 1e-5
     weight_decay: float = 1e-5
@@ -59,12 +59,12 @@ class TrainingConfig:
     save_epoch: int = 1
     
     # デバイス設定
-    device: str = "cuda:1"  # "cuda:0", "cuda:1", "cpu"
+    device: str = "cuda:0"  # "cuda:0", "cuda:1", "cpu"
     
     # ログ設定
     log_step: int = 50  # ステップごと
     validate_epoch: int = 1  # エポックごと
-    use_wandb: bool = False  # wandbの使用/不使用
+    use_wandb: bool = True  # wandbの使用/不使用
     wandb_project: str = "VisionConditionedASR"
 
 

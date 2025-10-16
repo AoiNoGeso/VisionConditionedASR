@@ -9,8 +9,10 @@ import numpy as np
 from tqdm import tqdm
 from pyctcdecode import build_ctcdecoder
 import jiwer
+from safetensors.torch import load_file
 
 from model import VisionConditionedASR
+from purewav2vec2_train import PureWav2Vec2ASR
 from dataloader import create_dataloader
 from train import TrainingConfig
 
@@ -19,17 +21,18 @@ from train import TrainingConfig
 class TestConfig:
     """評価設定"""
     # チェックポイント設定
-    checkpoint_path: str = "../checkpoints/checkpoint_epoch_4.pt"
+    checkpoint_dir: str = "../checkpoints/fp16_model/epoch_5"  # エポックディレクトリを指定
+    model_type: str = "vision"  # "pure" or "vision" - モデルタイプを指定
     
     # データセット設定
     val_json: str = "../../Datasets/SpokenCOCO/SpokenCOCO_val_fixed.json"
     audio_dir: str = "../../Datasets/SpokenCOCO"
     image_dir: str = "../../Datasets/stair_captions/images"
     
-    # モデル設定（チェックポイントから自動取得されるが、念のため）
+    # モデル設定（VisionConditionedASR用、念のため）
     vocab_size: Optional[int] = None
     hidden_dim: int = 256
-    num_heads: int = 2
+    num_heads: int = 4
     
     # データローダー設定
     batch_size: int = 16
@@ -46,7 +49,7 @@ class TestConfig:
     
     # 結果保存設定
     save_results: bool = True
-    results_dir: str = "../results"
+    results_dir: str = "../results/VASR/fp16_model"
 
 
 class CTCDecoder:
@@ -127,7 +130,6 @@ def compute_wer(references: List[str], hypotheses: List[str]) -> Dict[str, float
     Returns:
         WER統計情報の辞書
     """
-    # 💡修正: jiwerの新しいAPIを使用
     output = jiwer.process_words(references, hypotheses)
     
     # アライメントから統計を集計
@@ -158,32 +160,53 @@ def compute_wer(references: List[str], hypotheses: List[str]) -> Dict[str, float
     }
 
 
-def load_checkpoint(checkpoint_path: str, model: VisionConditionedASR, device: torch.device):
+def load_checkpoint(
+    checkpoint_dir: str, 
+    model: nn.Module, 
+    device: torch.device,
+    model_type: str = "vision"
+):
     """
-    チェックポイントからモデルを読み込む
+    チェックポイントからモデルを読み込む（safetensors形式対応）
     
     Args:
-        checkpoint_path: チェックポイントファイルのパス
+        checkpoint_dir: チェックポイントディレクトリのパス (例: ../checkpoints/epoch_4)
         model: モデルインスタンス
         device: デバイス
+        model_type: "pure" or "vision" - モデルのタイプ
     
     Returns:
         epoch: 学習済みエポック数
     """
-    if not os.path.exists(checkpoint_path):
-        raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
+    if not os.path.exists(checkpoint_dir):
+        raise FileNotFoundError(f"Checkpoint directory not found: {checkpoint_dir}")
     
-    print(f"\n[Loading] Loading checkpoint from: {checkpoint_path}")
-    # 💡修正: weights_only=Falseを指定（信頼できるチェックポイントの場合）
-    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    # エポック番号を取得
+    epoch_num = os.path.basename(checkpoint_dir).split('_')[-1]
     
-    # モデルの重みをロード
-    model.load_state_dict(checkpoint['model_state_dict'])
+    # モデルファイルのパス
+    model_path = os.path.join(checkpoint_dir, f"model_epoch_{epoch_num}.safetensors")
+    state_path = os.path.join(checkpoint_dir, f"checkpoint_epoch_{epoch_num}_state.pt")
+    
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Model file not found: {model_path}")
+    if not os.path.exists(state_path):
+        raise FileNotFoundError(f"State file not found: {state_path}")
+    
+    print(f"\n[Loading] Loading checkpoint from: {checkpoint_dir}")
+    print(f"[Loading] Model type: {model_type}")
+    
+    # モデルの重みをロード（safetensors）
+    state_dict = load_file(model_path, device=str(device))
+    model.load_state_dict(state_dict)
+    
+    # 学習状態をロード（.pt）
+    checkpoint_state = torch.load(state_path, map_location=device, weights_only=False)
     
     # チェックポイント情報を表示
-    epoch = checkpoint.get('epoch', -1)
-    train_loss = checkpoint.get('train_loss', 0.0)
-    val_loss = checkpoint.get('val_loss', 0.0)
+    epoch = checkpoint_state.get('epoch', -1)
+    train_loss = checkpoint_state.get('train_loss', 0.0)
+    val_loss = checkpoint_state.get('val_loss', 0.0)
     
     print(f"[Loading] Checkpoint loaded successfully")
     print(f"  Epoch: {epoch + 1}")
@@ -194,7 +217,7 @@ def load_checkpoint(checkpoint_path: str, model: VisionConditionedASR, device: t
 
 
 def evaluate(
-    model: VisionConditionedASR,
+    model: nn.Module,
     dataloader: DataLoader,
     decoder: CTCDecoder,
     device: torch.device,
@@ -204,7 +227,7 @@ def evaluate(
     モデルを評価してWERを計算
     
     Args:
-        model: 評価するモデル
+        model: 評価するモデル（VisionConditionedASR or PureWav2Vec2ASR）
         dataloader: 検証データローダー
         decoder: CTCデコーダー
         device: デバイス
@@ -295,7 +318,7 @@ def evaluate(
     }
 
 
-def save_results(results: Dict, config: TestConfig, checkpoint_epoch: int):
+def save_results(results: Dict, config: TestConfig, checkpoint_epoch: int, model_type: str):
     """
     評価結果を保存
     
@@ -303,22 +326,24 @@ def save_results(results: Dict, config: TestConfig, checkpoint_epoch: int):
         results: 評価結果
         config: 評価設定
         checkpoint_epoch: チェックポイントのエポック数
+        model_type: "pure" or "vision" - モデルのタイプ
     """
     os.makedirs(config.results_dir, exist_ok=True)
     
-    # 結果ファイルのパス
+    # 結果ファイルのパス（モデルタイプを含める）
     results_file = os.path.join(
         config.results_dir,
-        f"wer_results_epoch_{checkpoint_epoch}.txt"
+        f"wer_results_{model_type}_epoch_{checkpoint_epoch}.txt"
     )
     
     # テキストファイルに保存
     with open(results_file, 'w', encoding='utf-8') as f:
         f.write("="*60 + "\n")
-        f.write("WER Evaluation Results\n")
+        f.write(f"WER Evaluation Results ({model_type.upper()} Model)\n")
         f.write("="*60 + "\n\n")
         
-        f.write(f"Checkpoint: {config.checkpoint_path}\n")
+        f.write(f"Model Type: {model_type}\n")
+        f.write(f"Checkpoint: {config.checkpoint_dir}\n")
         f.write(f"Epoch: {checkpoint_epoch}\n")
         f.write(f"Dataset: {config.val_json}\n")
         f.write(f"Beam Search: {config.use_beam_search}\n")
@@ -350,7 +375,7 @@ def save_results(results: Dict, config: TestConfig, checkpoint_epoch: int):
     # 詳細な結果をCSVで保存
     csv_file = os.path.join(
         config.results_dir,
-        f"predictions_epoch_{checkpoint_epoch}.csv"
+        f"predictions_{model_type}_epoch_{checkpoint_epoch}.csv"
     )
     
     import csv
@@ -373,8 +398,9 @@ def main():
     print(f"\n{'='*60}")
     print("Test Configuration")
     print(f"{'='*60}")
+    print(f"Model Type: {config.model_type}")
     print(f"Device: {device}")
-    print(f"Checkpoint: {config.checkpoint_path}")
+    print(f"Checkpoint: {config.checkpoint_dir}")
     print(f"Batch size: {config.batch_size}")
     print(f"Beam search: {config.use_beam_search}")
     if config.use_beam_search:
@@ -385,17 +411,29 @@ def main():
     print("[Setup] Loading tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained("facebook/wav2vec2-base-960h")
     
-    # モデルの初期化
+    # モデルの初期化（タイプに応じて）
     print("[Setup] Initializing model...")
-    model = VisionConditionedASR(
-        vocab_size=config.vocab_size,
-        hidden_dim=config.hidden_dim,
-        num_heads=config.num_heads,
-        device=device
-    ).to(device)
+    if config.model_type == "pure":
+        model = PureWav2Vec2ASR(device=device).to(device)
+        print("[Model] Using PureWav2Vec2ASR")
+    elif config.model_type == "vision":
+        model = VisionConditionedASR(
+            vocab_size=config.vocab_size,
+            hidden_dim=config.hidden_dim,
+            num_heads=config.num_heads,
+            device=device
+        ).to(device)
+        print("[Model] Using VisionConditionedASR")
+    else:
+        raise ValueError(f"Unknown model_type: {config.model_type}. Must be 'pure' or 'vision'")
     
     # チェックポイントのロード
-    checkpoint_epoch = load_checkpoint(config.checkpoint_path, model, device)
+    checkpoint_epoch = load_checkpoint(
+        config.checkpoint_dir, 
+        model, 
+        device,
+        model_type=config.model_type
+    )
     
     # デコーダーの初期化
     print("\n[Setup] Initializing decoder...")
@@ -429,7 +467,7 @@ def main():
     
     # 結果の保存
     if config.save_results:
-        save_results(results, config, checkpoint_epoch)
+        save_results(results, config, checkpoint_epoch, config.model_type)
     
     print("="*60)
     print("Evaluation Completed!")
