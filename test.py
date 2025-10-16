@@ -10,6 +10,7 @@ from tqdm import tqdm
 from pyctcdecode import build_ctcdecoder
 import jiwer
 from safetensors.torch import load_file
+from audiomentations import Compose, AddGaussianSNR, AddBackgroundNoise, PolarityInversion
 
 from model import VisionConditionedASR
 from purewav2vec2_train import PureWav2Vec2ASR
@@ -40,16 +41,115 @@ class TestConfig:
     max_audio_length: float = 10.0
     validate_files: bool = True
     
+    # ノイズ設定
+    noise_type: str = "none"  # "none", "gaussian", "white", "background"
+    noise_dir: Optional[str] = "../../Datasets/noise"  # バックグラウンドノイズ用ディレクトリ
+    gaussian_snr_db: tuple = (5, 20)  # ガウシアンノイズのSNR範囲(dB)
+    white_noise_level: float = 0.01  # ホワイトノイズのレベル (0.0-1.0)
+    background_snr_db: tuple = (5, 20)  # バックグラウンドノイズのSNR範囲(dB)
+    
     # デコーディング設定
     use_beam_search: bool = True
     beam_width: int = 10
+    
+    # 画像使用設定（VisionConditionedASR用）
+    use_image: bool = False  # False: 画像情報を与えない（vision encoderの出力を0ベクトル化）
     
     # デバイス設定
     device: str = "cuda:1"
     
     # 結果保存設定
     save_results: bool = True
-    results_dir: str = "../results/VASR/fp16_model"
+    results_dir: str = "../results/VASR/fp16_model/without_image"
+    # results_dir: str = "../results/pure/clear"
+
+
+class NoiseAugmenter:
+    """音声にノイズを付加するクラス"""
+    
+    def __init__(self, noise_type: str = "none", gaussian_snr_db: tuple = (5, 20),
+                 white_noise_level: float = 0.01, noise_dir: Optional[str] = None, 
+                 background_snr_db: tuple = (5, 20), sample_rate: int = 16000):
+        """
+        Args:
+            noise_type: ノイズタイプ ("none", "gaussian", "white", "background")
+            gaussian_snr_db: ガウシアンノイズのSNR範囲(dB)
+            white_noise_level: ホワイトノイズのレベル
+            noise_dir: バックグラウンドノイズファイルのディレクトリ
+            background_snr_db: バックグラウンドノイズのSNR範囲(dB)
+            sample_rate: サンプリングレート
+        """
+        self.noise_type = noise_type
+        self.sample_rate = sample_rate
+        
+        print(f"\n[NoiseAugmenter] Initializing with noise_type: {noise_type}")
+        
+        if noise_type == "none":
+            self.augment = None
+            print("  No noise augmentation")
+            
+        elif noise_type == "gaussian":
+            self.augment = Compose([
+                AddGaussianSNR(min_snr_db=gaussian_snr_db[0], max_snr_db=gaussian_snr_db[1], p=1.0)
+            ])
+            print(f"  Gaussian noise SNR: {gaussian_snr_db[0]}-{gaussian_snr_db[1]} dB")
+            
+        elif noise_type == "white":
+            # ホワイトノイズは均一分布のガウシアンノイズとして実装
+            # AddGaussianSNRの代わりに固定振幅のノイズを使用
+            from audiomentations import AddGaussianNoise
+            self.augment = Compose([
+                AddGaussianNoise(min_amplitude=white_noise_level, max_amplitude=white_noise_level, p=1.0)
+            ])
+            print(f"  White noise level: {white_noise_level}")
+            
+        elif noise_type == "background":
+            if noise_dir is None or not os.path.exists(noise_dir):
+                raise ValueError(f"Background noise directory not found: {noise_dir}")
+            
+            # ノイズファイルのリストを取得
+            noise_files = [os.path.join(noise_dir, f) for f in os.listdir(noise_dir) 
+                          if f.endswith(('.wav', '.mp3', '.flac'))]
+            
+            if len(noise_files) == 0:
+                raise ValueError(f"No noise files found in: {noise_dir}")
+            
+            self.augment = Compose([
+                AddBackgroundNoise(
+                    sounds_path=noise_dir,
+                    min_snr_in_db=background_snr_db[0],
+                    max_snr_in_db=background_snr_db[1],
+                    p=1.0
+                )
+            ])
+            print(f"  Background noise from: {noise_dir}")
+            print(f"  Found {len(noise_files)} noise files")
+            print(f"  SNR range: {background_snr_db[0]}-{background_snr_db[1]} dB")
+            
+        else:
+            raise ValueError(f"Unknown noise_type: {noise_type}")
+    
+    def apply(self, audio: np.ndarray) -> np.ndarray:
+        """
+        音声にノイズを付加
+        
+        Args:
+            audio: 音声データ (numpy array, shape: (T,))
+        
+        Returns:
+            ノイズが付加された音声データ
+        """
+        if self.augment is None:
+            return audio
+        
+        # audiomentationsはfloat32を期待
+        if audio.dtype != np.float32:
+            audio = audio.astype(np.float32)
+        
+        # ノイズを付加
+        augmented_audio = self.augment(samples=audio, sample_rate=self.sample_rate)
+        
+        return augmented_audio
 
 
 class CTCDecoder:
@@ -220,6 +320,7 @@ def evaluate(
     model: nn.Module,
     dataloader: DataLoader,
     decoder: CTCDecoder,
+    noise_augmenter: NoiseAugmenter,
     device: torch.device,
     config: TestConfig
 ):
@@ -230,6 +331,7 @@ def evaluate(
         model: 評価するモデル（VisionConditionedASR or PureWav2Vec2ASR）
         dataloader: 検証データローダー
         decoder: CTCデコーダー
+        noise_augmenter: ノイズ付加器
         device: デバイス
         config: 評価設定
     
@@ -237,6 +339,18 @@ def evaluate(
         results: 評価結果の辞書
     """
     model.eval()
+    
+    # VisionConditionedASRで画像を使用しない場合、vision encoderをフックで無効化
+    hook_handle = None
+    if config.model_type == "vision" and not config.use_image:
+        print("\n[Evaluation] Image information disabled (vision encoder output set to zero)")
+        
+        def zero_vision_output_hook(module, input, output):
+            """Vision encoderの出力を0ベクトルにするフック"""
+            return torch.zeros_like(output)
+        
+        # Vision encoderにフックを登録
+        hook_handle = model.vision_encoder.register_forward_hook(zero_vision_output_hook)
     
     all_references = []
     all_hypotheses = []
@@ -247,35 +361,53 @@ def evaluate(
     print(f"{'='*60}")
     print(f"Dataset size: {len(dataloader.dataset)}")
     print(f"Number of batches: {len(dataloader)}")
+    print(f"Noise type: {config.noise_type}")
+    if config.model_type == "vision":
+        print(f"Use image: {config.use_image}")
     print(f"{'='*60}\n")
     
-    with torch.no_grad():
-        for batch_idx, batch in enumerate(tqdm(dataloader, desc="Evaluating")):
-            try:
-                # Forward pass
-                logits = model(batch)  # [B, T, vocab_size]
-                
-                # デコーディング
-                hypotheses = decoder.decode(logits)
-                references = batch["text"]
-                
-                # 結果を保存
-                all_references.extend(references)
-                all_hypotheses.extend(hypotheses)
-                
-                # 詳細な結果を保存（最初の100サンプルのみ）
-                if len(all_samples) < 100:
-                    for ref, hyp in zip(references, hypotheses):
-                        all_samples.append({
-                            'reference': ref,
-                            'hypothesis': hyp
-                        })
-                
-            except Exception as e:
-                print(f"\n[Error] Exception at batch {batch_idx}: {e}")
-                import traceback
-                traceback.print_exc()
-                continue
+    try:
+        with torch.no_grad():
+            for batch_idx, batch in enumerate(tqdm(dataloader, desc="Evaluating")):
+                try:
+                    # ノイズを付加
+                    if noise_augmenter.augment is not None:
+                        noisy_wav = []
+                        for wav in batch["wav"]:
+                            augmented = noise_augmenter.apply(wav)
+                            noisy_wav.append(augmented)
+                        batch["wav"] = noisy_wav
+                    
+                    # Forward pass
+                    logits = model(batch)  # [B, T, vocab_size]
+                    
+                    # デコーディング
+                    hypotheses = decoder.decode(logits)
+                    references = batch["text"]
+                    
+                    # 結果を保存
+                    all_references.extend(references)
+                    all_hypotheses.extend(hypotheses)
+                    
+                    # 詳細な結果を保存（最初の100サンプルのみ）
+                    if len(all_samples) < 100:
+                        for ref, hyp in zip(references, hypotheses):
+                            all_samples.append({
+                                'reference': ref,
+                                'hypothesis': hyp
+                            })
+                    
+                except Exception as e:
+                    print(f"\n[Error] Exception at batch {batch_idx}: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    continue
+    
+    finally:
+        # フックを解除
+        if hook_handle is not None:
+            hook_handle.remove()
+            print("\n[Evaluation] Vision encoder hook removed")
     
     # WERの計算
     print(f"\n{'='*60}")
@@ -289,6 +421,9 @@ def evaluate(
     print("Evaluation Results")
     print(f"{'='*60}")
     print(f"Total samples: {len(all_references)}")
+    print(f"Noise type: {config.noise_type}")
+    if config.model_type == "vision":
+        print(f"Use image: {config.use_image}")
     print(f"\nWord Error Rate (WER): {wer_metrics['wer']:.2f}%")
     print(f"Match Error Rate (MER): {wer_metrics['mer']:.2f}%")
     print(f"Word Information Lost (WIL): {wer_metrics['wil']:.2f}%")
@@ -330,11 +465,15 @@ def save_results(results: Dict, config: TestConfig, checkpoint_epoch: int, model
     """
     os.makedirs(config.results_dir, exist_ok=True)
     
-    # 結果ファイルのパス（モデルタイプを含める）
-    results_file = os.path.join(
-        config.results_dir,
-        f"wer_results_{model_type}_epoch_{checkpoint_epoch}.txt"
-    )
+    # ファイル名の構築（モデルタイプ、ノイズタイプ、画像使用の有無を含める）
+    filename_parts = [f"wer_results_{model_type}_epoch_{checkpoint_epoch}"]
+    
+    if config.model_type == "vision" and not config.use_image:
+        filename_parts.append("noimage")
+    
+    filename_parts.append(f"noise_{config.noise_type}")
+    
+    results_file = os.path.join(config.results_dir, "_".join(filename_parts) + ".txt")
     
     # テキストファイルに保存
     with open(results_file, 'w', encoding='utf-8') as f:
@@ -343,9 +482,18 @@ def save_results(results: Dict, config: TestConfig, checkpoint_epoch: int, model
         f.write("="*60 + "\n\n")
         
         f.write(f"Model Type: {model_type}\n")
+        if config.model_type == "vision":
+            f.write(f"Use Image: {config.use_image}\n")
         f.write(f"Checkpoint: {config.checkpoint_dir}\n")
         f.write(f"Epoch: {checkpoint_epoch}\n")
         f.write(f"Dataset: {config.val_json}\n")
+        f.write(f"Noise Type: {config.noise_type}\n")
+        if config.noise_type == "gaussian":
+            f.write(f"Gaussian SNR: {config.gaussian_snr_db[0]}-{config.gaussian_snr_db[1]} dB\n")
+        elif config.noise_type == "white":
+            f.write(f"White Noise Level: {config.white_noise_level}\n")
+        elif config.noise_type == "background":
+            f.write(f"Background SNR: {config.background_snr_db[0]}-{config.background_snr_db[1]} dB\n")
         f.write(f"Beam Search: {config.use_beam_search}\n")
         if config.use_beam_search:
             f.write(f"Beam Width: {config.beam_width}\n")
@@ -373,10 +521,14 @@ def save_results(results: Dict, config: TestConfig, checkpoint_epoch: int, model
     print(f"[Results] Saved to: {results_file}\n")
     
     # 詳細な結果をCSVで保存
-    csv_file = os.path.join(
-        config.results_dir,
-        f"predictions_{model_type}_epoch_{checkpoint_epoch}.csv"
-    )
+    csv_filename_parts = [f"predictions_{model_type}_epoch_{checkpoint_epoch}"]
+    
+    if config.model_type == "vision" and not config.use_image:
+        csv_filename_parts.append("noimage")
+    
+    csv_filename_parts.append(f"noise_{config.noise_type}")
+    
+    csv_file = os.path.join(config.results_dir, "_".join(csv_filename_parts) + ".csv")
     
     import csv
     with open(csv_file, 'w', encoding='utf-8', newline='') as f:
@@ -402,13 +554,27 @@ def main():
     print(f"Device: {device}")
     print(f"Checkpoint: {config.checkpoint_dir}")
     print(f"Batch size: {config.batch_size}")
+    print(f"Noise type: {config.noise_type}")
+    if config.model_type == "vision":
+        print(f"Use image: {config.use_image}")
     print(f"Beam search: {config.use_beam_search}")
     if config.use_beam_search:
         print(f"Beam width: {config.beam_width}")
     print(f"{'='*60}\n")
     
+    # ノイズ付加器の初期化
+    print("[Setup] Initializing noise augmenter...")
+    noise_augmenter = NoiseAugmenter(
+        noise_type=config.noise_type,
+        gaussian_snr_db=config.gaussian_snr_db,
+        white_noise_level=config.white_noise_level,
+        noise_dir=config.noise_dir,
+        background_snr_db=config.background_snr_db,
+        sample_rate=16000
+    )
+    
     # トークナイザーの初期化
-    print("[Setup] Loading tokenizer...")
+    print("\n[Setup] Loading tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained("facebook/wav2vec2-base-960h")
     
     # モデルの初期化（タイプに応じて）
@@ -461,6 +627,7 @@ def main():
         model=model,
         dataloader=val_loader,
         decoder=decoder,
+        noise_augmenter=noise_augmenter,
         device=device,
         config=config
     )
