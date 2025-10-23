@@ -22,7 +22,7 @@ from train import TrainingConfig
 class TestConfig:
     """評価設定"""
     # チェックポイント設定
-    checkpoint_dir: str = "../checkpoints/fp16_model/epoch_5"  # エポックディレクトリを指定
+    checkpoint_dir: str = "../checkpoints/pureCross/epoch_5"  # エポックディレクトリを指定
     model_type: str = "vision"  # "pure" or "vision" - モデルタイプを指定
     
     # データセット設定
@@ -42,7 +42,7 @@ class TestConfig:
     validate_files: bool = True
     
     # ノイズ設定
-    noise_type: str = "none"  # "none", "gaussian", "white", "background"
+    noise_type: str = "white"  # "none", "gaussian", "white", "background"
     noise_dir: Optional[str] = "../../Datasets/noise"  # バックグラウンドノイズ用ディレクトリ
     gaussian_snr_db: tuple = (5, 20)  # ガウシアンノイズのSNR範囲(dB)
     white_noise_level: float = 0.01  # ホワイトノイズのレベル (0.0-1.0)
@@ -56,12 +56,11 @@ class TestConfig:
     use_image: bool = False  # False: 画像情報を与えない（vision encoderの出力を0ベクトル化）
     
     # デバイス設定
-    device: str = "cuda:1"
+    device: str = "cuda:0"
     
     # 結果保存設定
     save_results: bool = True
-    results_dir: str = "../results/VASR/fp16_model/without_image"
-    # results_dir: str = "../results/pure/clear"
+    results_dir: str = "../results/white/pureCross/withoutImage"
 
 
 class NoiseAugmenter:
